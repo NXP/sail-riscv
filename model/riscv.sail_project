@@ -361,6 +361,13 @@ extensions {
     files extensions/Sstc/sstc.sail
   }
 
+  // ACLIC: shared interrupt-status CSR state (mistatus/sistatus)
+  aclic_regs {
+    requires core
+    before sys
+    files extensions/aclic/aclic_regs.sail
+  }
+
   Zawrs {
     requires core
 
