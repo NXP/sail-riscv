@@ -564,6 +564,11 @@ enum clause extension = Ext_Smcsps
 mapping clause extensionName = Ext_Smcsps <-> "smcsps"
 function clause hartSupports(Ext_Smcsps) = config extensions.Smcsps.supported
 function clause currentlyEnabled(Ext_Smcsps) = hartSupports(Ext_Smcsps)
+// Conditional Stack Pointer Swap (supervisor level)
+enum clause extension = Ext_Sscsps
+mapping clause extensionName = Ext_Sscsps <-> "sscsps"
+function clause hartSupports(Ext_Sscsps) = (config extensions.Sscsps.supported : bool) & hartSupports(Ext_Smcsps) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Sscsps) = hartSupports(Ext_Sscsps) & currentlyEnabled(Ext_S)
 
 // QoS identifiers
 enum clause extension = Ext_Ssqosid
@@ -846,4 +851,5 @@ let extensions_ordered_for_isa_string = [
   Ext_Smmpm,
   Ext_Smnpm,
   Ext_Smstateen,
+  Ext_Sscsps,
 ]
