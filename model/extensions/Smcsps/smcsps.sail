@@ -21,21 +21,13 @@ register sspcs : xlenbits = zeros()
 mapping clause csr_name_map = 0x349 <-> "mspcs"
 mapping clause csr_name_map = 0x149 <-> "sspcs"
 
-// Smstateen bit 53 (ACLIC) gates supervisor access to sspcs. The ACLIC bit
-// is not yet modeled in Mstateen0, so this check currently always passes.
-// TODO: gate on mstateen0 bit 53 once the ACLIC state-enable bit is added.
-function aclic_stateen_ok(priv : Privilege) -> bool =
-  match priv {
-    Machine    => true,
-    Supervisor => true,
-    _          => false,
-  }
-
-
+// Supervisor access to sspcs is additionally gated by the ACLIC bit
+// (mstateen0 bit 53); that check is applied centrally in
+// `stateen_allows_CSR_access`.
 function clause is_CSR_accessible(0x349, priv, _) =
   currentlyEnabled(Ext_Smcsps) & priv == Machine
 function clause is_CSR_accessible(0x149, priv, _) =
-  currentlyEnabled(Ext_Sscsps) & (priv == Machine | priv == Supervisor) & aclic_stateen_ok(priv)
+  currentlyEnabled(Ext_Sscsps) & (priv == Machine | priv == Supervisor)
 
 function clause read_CSR(0x349) = mspcs
 function clause read_CSR(0x149) = sspcs

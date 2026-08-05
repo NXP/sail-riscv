@@ -52,6 +52,9 @@ function stateen_allows_CSR_access(csr : csreg, priv : Privilege, _access_type :
     // srmcfg
     (0x181, priv) => check_stateen_bit(priv, STATEEN_SRMCFG, 0),
 
+    // sspcs
+    (0x149, priv) => check_stateen_bit(priv, STATEEN_ACLIC, 0),
+
     // fflags
     (0x001, priv) => if hartSupports(Ext_Zfinx) then check_stateen_bit(priv, STATEEN_FCSR, 0) else true,
     // frm
