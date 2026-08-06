@@ -271,3 +271,68 @@ val handle_interrupt_aclic : (InterruptType, Privilege) -> unit
 // vectoring (xijt_ext_enabled).
 function xip_ext_enabled(priv : Privilege) -> bool = false
 function try_interrupt_push(priv : Privilege) -> option(sync_exception) = None()
+
+function clause write_CSR(0x146, value) = { set_sistatus(value); Ok(get_sistatus()) }
+
+// -------------------------------------------------------------------------
+// miconfig / siconfig - interrupt configuration CSRs (Smip/Ssip).
+//
+// The ACLIC specification accesses miconfig/siconfig indirectly at
+// *iselect == 0x1000 through mireg/sireg (Smcsrind/Sscsrind), so there are
+// no direct CSR numbers for these registers. The machine view (miconfig)
+// exposes the full register; the supervisor view (siconfig) is a subset
+// exposing only the S-visible fields (sipu, snipbits).
+//
+// Only the fields relevant to the currently modeled extensions are backed
+// by state:
+//   4  mipu  (Smip): enable interrupt-handler push at machine level
+//   5  sipu  (Ssip): enable interrupt-handler push at supervisor level
+// The nested-preemption fields (mnipbits/snipbits/mnipen/snipen) belong to
+// the Smnip/Ssnip extensions and are read-only zero here.
+bitfield Miconfig : bits(64) = {
+  snipbits : 19 .. 16,  // Ssnip: RO 0 for now
+  mnipbits : 11 .. 8,   // Smnip: RO 0 for now
+  sipu     : 5,         // Ssip:  supervisor push-enable
+  mipu     : 4,         // Smip:  machine push-enable
+  snipen   : 3,         // Ssnip: RO 0 for now
+  mnipen   : 2,         // Smnip: RO 0 for now
+}
+
+register miconfig : Miconfig = Mk_Miconfig(zeros())
+
+// WARL legalization: only mipu/sipu are writable, and only when the
+// corresponding extension is supported. All other fields are read-only 0.
+function legalize_miconfig(v : Miconfig) -> Miconfig = {
+  let m = if hartSupports(Ext_Smip) then v[mipu] else 0b0;
+  let s = if hartSupports(Ext_Ssip) then v[sipu] else 0b0;
+  [Mk_Miconfig(zeros()) with mipu = m, sipu = s]
+}
+
+// The *iselect value at which miconfig/siconfig are accessed.
+let ACLIC_ICONFIG_SELECT : xlenbits = zero_extend(0x1000)
+
+// Register the miconfig/siconfig views with the indirect CSR framework.
+// The M-view is gated by Smip, the S-view (siconfig) by Ssip. Selects
+// other than 0x1000 fall through to the default (unimplemented) clauses.
+function clause indirect_csr_implemented((Machine, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+  currentlyEnabled(Ext_Smip)
+function clause indirect_csr_implemented((Supervisor, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+  currentlyEnabled(Ext_Ssip)
+
+function clause indirect_read((Machine, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+  miconfig.bits[xlen - 1 .. 0]
+// siconfig is a subset view of miconfig: only sipu and snipbits are visible.
+function clause indirect_read((Supervisor, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+  [Mk_Miconfig(zeros()) with sipu = miconfig[sipu], snipbits = miconfig[snipbits]].bits[xlen - 1 .. 0]
+
+function clause indirect_write((Machine, select, 1, value) if select == ACLIC_ICONFIG_SELECT) = {
+  miconfig = legalize_miconfig(Mk_Miconfig(zero_extend(value)))
+}
+// Writing siconfig updates only the S-visible fields of miconfig; the
+// M-only fields are preserved.
+function clause indirect_write((Supervisor, select, 1, value) if select == ACLIC_ICONFIG_SELECT) = {
+  let w = Mk_Miconfig(zero_extend(value));
+  let merged = [miconfig with sipu = w[sipu]];
+  miconfig = legalize_miconfig(merged)
+}
+

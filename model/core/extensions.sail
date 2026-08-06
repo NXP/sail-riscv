@@ -593,6 +593,16 @@ mapping clause extensionName = Ext_Ssehv <-> "ssehv"
 function clause hartSupports(Ext_Ssehv) = (config extensions.Ssehv.supported : bool) & hartSupports(Ext_Smehv) & hartSupports(Ext_Ssijt) & hartSupports(Ext_S)
 function clause currentlyEnabled(Ext_Ssehv) = hartSupports(Ext_Ssehv) & currentlyEnabled(Ext_Ssijt) & currentlyEnabled(Ext_S)
 
+// Interrupt handler push and pop (machine level)
+enum clause extension = Ext_Smip
+mapping clause extensionName = Ext_Smip <-> "smip"
+function clause hartSupports(Ext_Smip) = config extensions.Smip.supported
+function clause currentlyEnabled(Ext_Smip) = hartSupports(Ext_Smip)
+// Interrupt handler push and pop (supervisor level)
+enum clause extension = Ext_Ssip
+mapping clause extensionName = Ext_Ssip <-> "ssip"
+function clause hartSupports(Ext_Ssip) = (config extensions.Ssip.supported : bool) & hartSupports(Ext_Smip) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssip) = hartSupports(Ext_Ssip) & currentlyEnabled(Ext_S)
 
 
 // QoS identifiers
@@ -909,6 +919,7 @@ let extensions_ordered_for_isa_string = [
   Ext_Smcsps,
   Ext_Smehv,
   Ext_Smijt,
+  Ext_Smip,
   Ext_Smcsrind,
   Ext_Smmpm,
   Ext_Smnpm,
@@ -916,6 +927,7 @@ let extensions_ordered_for_isa_string = [
   Ext_Sscsps,
   Ext_Ssehv,
   Ext_Ssijt,
+  Ext_Ssip,
 ]
 
 
