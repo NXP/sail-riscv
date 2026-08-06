@@ -161,3 +161,66 @@ function clause read_CSR(0x146) = get_sistatus()
 
 function clause write_CSR(0x346, value) = { set_mistatus(value); Ok(get_mistatus()) }
 function clause write_CSR(0x146, value) = { set_sistatus(value); Ok(get_sistatus()) }
+
+// -------------------------------------------------------------------------
+// miconfig / siconfig - interrupt configuration CSRs.
+//
+// The ACLIC specification accesses miconfig/siconfig indirectly through
+// miselect=0x1000 / mireg. This model does not implement the indirect
+// CSR access mechanism, so, consistent with the treatment of
+// mistatus/sistatus above, miconfig and siconfig are exposed at the
+// otherwise-unused direct CSR addresses 0x347 and 0x147.
+//
+// Only the fields relevant to the currently modeled extensions are backed
+// by state:
+//   4  mipu  (Smip): enable interrupt-handler push at machine level
+//   5  sipu  (Ssip): enable interrupt-handler push at supervisor level
+// The nested-preemption fields (mnipbits/snipbits/mnipen/snipen) belong to
+// the Smnip/Ssnip extensions and are read-only zero here. siconfig is a
+// subset view of miconfig sharing the same physical bits.
+bitfield Miconfig : bits(64) = {
+  snipbits : 19 .. 16,  // Ssnip: RO 0 for now
+  mnipbits : 11 .. 8,   // Smnip: RO 0 for now
+  sipu     : 5,         // Ssip:  supervisor push-enable
+  mipu     : 4,         // Smip:  machine push-enable
+  snipen   : 3,         // Ssnip: RO 0 for now
+  mnipen   : 2,         // Smnip: RO 0 for now
+}
+
+register miconfig : Miconfig = Mk_Miconfig(zeros())
+
+// WARL legalization: only mipu/sipu are writable, and only when the
+// corresponding extension is supported. All other fields are read-only 0.
+function legalize_miconfig(v : Miconfig) -> Miconfig = {
+  let m = if hartSupports(Ext_Smip) then v[mipu] else 0b0;
+  let s = if hartSupports(Ext_Ssip) then v[sipu] else 0b0;
+  [Mk_Miconfig(zeros()) with mipu = m, sipu = s]
+}
+
+mapping clause csr_name_map = 0x347 <-> "miconfig"
+mapping clause csr_name_map = 0x147 <-> "siconfig"
+
+function clause is_CSR_accessible(0x347, priv, _) =
+  currentlyEnabled(Ext_Smip) & priv == Machine
+function clause is_CSR_accessible(0x147, priv, _) =
+  currentlyEnabled(Ext_Ssip) & (priv == Machine | priv == Supervisor)
+
+function clause read_CSR(0x347) = miconfig.bits[xlen - 1 .. 0]
+// siconfig is a subset view of miconfig: it exposes only the S-visible
+// fields (sipu and snipbits). Mask out the M-only fields on read.
+function clause read_CSR(0x147) =
+  [Mk_Miconfig(zeros()) with sipu = miconfig[sipu], snipbits = miconfig[snipbits]].bits[xlen - 1 .. 0]
+
+function clause write_CSR(0x347, value) = {
+  miconfig = legalize_miconfig(Mk_Miconfig(zero_extend(value)));
+  Ok(miconfig.bits[xlen - 1 .. 0])
+}
+// Writing siconfig updates only the S-visible fields of miconfig; the
+// M-only fields are preserved.
+function clause write_CSR(0x147, value) = {
+  let w = Mk_Miconfig(zero_extend(value));
+  let merged = [miconfig with sipu = w[sipu]];
+  miconfig = legalize_miconfig(merged);
+  Ok(read_CSR(0x147))
+}
+

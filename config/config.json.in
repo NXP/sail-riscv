@@ -786,6 +786,12 @@
     "Sscsps": {
       "supported": false
     },
+    "Smip": {
+      "supported": false
+    },
+    "Ssip": {
+      "supported": false
+    },
     // Enabling Sstvala requires that the exceptions specified in the extension
     // have their appropriate settings under `base.xtval_nonzero`.
     "Sstvala": {
