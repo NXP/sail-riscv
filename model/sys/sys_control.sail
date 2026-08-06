@@ -318,9 +318,13 @@ function make_sync_exception(e : ExceptionType, xtval : xlenbits) -> sync_except
 function handle_exception(xtval : xlenbits, e : ExceptionType) -> unit =
   set_next_pc(exception_handler(cur_privilege, make_sync_exception(e, xtval), PC))
 
-// Interrupt trap entry. Without any ACLIC trap-entry extension this just
-// enters the trap and takes the vector; otherwise the ACLIC path
-// (jump-table lookup, handler push, pending-bit clear) is taken, defined in
+// Interrupt trap entry. Without any ACLIC trap-entry extension enabled for
+// del_priv this just enters the trap and takes the vector. When an ACLIC
+// trap-entry extension is active (jump-table vectoring or the Smip/Ssip
+// interrupt-handler push) the ACLIC path is taken instead: it performs the
+// jump-table lookup, the handler push, and the pending-bit clear, taking any
+// faulting push/lookup as a precise synchronous exception with the
+// interrupted context left intact. Defined in
 // extensions/aclic/aclic_sys_control.sail.
 function handle_interrupt(i : InterruptType, del_priv : Privilege) -> unit =
   if not(aclic_trap_entry_active(del_priv))

@@ -247,6 +247,11 @@ val xijt_ext_enabled : Privilege -> bool
 // Smip/Ssip interrupt-handler push. Some(exc) if a push store faulted.
 val try_interrupt_push : Privilege -> option(sync_exception)
 
+// Is the interrupt-handler push extension (Smip/Ssip) enabled for priv?
+// Defined in extensions/aclic/smip.sail; declared here so
+// aclic_trap_entry_active in aclic_sys_control.sail can consult it.
+val xip_ext_enabled : Privilege -> bool
+
 // Smehv/Ssehv synchronous exception hardware-vectoring hook, defined in
 // extensions/aclic/smehv.sail but declared here so trap_handler in
 // sys/sys_control.sail can consult it when computing the trap vector.
@@ -262,15 +267,6 @@ val smehv_exc_vector : (Privilege, Mcause) -> option(xlenbits)
 // takes this path only when aclic_trap_entry_active holds.
 val aclic_trap_entry_active : Privilege -> bool
 val handle_interrupt_aclic : (InterruptType, Privilege) -> unit
-
-// Smip/Ssip interrupt-handler push hooks. The real bodies live in the
-// Smip/Ssip extension (extensions/aclic/smip.sail), which depends on the
-// indirect-CSR miconfig and is therefore not part of this base layer. Until
-// that extension is present these reduce to no-ops: no handler-stack push is
-// performed and the ACLIC trap-entry path is gated purely by jump-table
-// vectoring (xijt_ext_enabled).
-function xip_ext_enabled(priv : Privilege) -> bool = false
-function try_interrupt_push(priv : Privilege) -> option(sync_exception) = None()
 
 function clause write_CSR(0x146, value) = { set_sistatus(value); Ok(get_sistatus()) }
 
@@ -311,6 +307,15 @@ function legalize_miconfig(v : Miconfig) -> Miconfig = {
 // The *iselect value at which miconfig/siconfig are accessed.
 let ACLIC_ICONFIG_SELECT : xlenbits = zero_extend(0x1000)
 
+// Accessor used by the interrupt trap-entry logic: is push enabled at priv?
+function xiconfig_ipu(priv : Privilege) -> bits(1) =
+  match priv {
+    Machine    => miconfig[mipu],
+    Supervisor => miconfig[sipu],
+    _          => 0b0,
+  }
+
+
 // Register the miconfig/siconfig views with the indirect CSR framework.
 // The M-view is gated by Smip, the S-view (siconfig) by Ssip. Selects
 // other than 0x1000 fall through to the default (unimplemented) clauses.
@@ -335,4 +340,17 @@ function clause indirect_write((Supervisor, select, 1, value) if select == ACLIC
   let merged = [miconfig with sipu = w[sipu]];
   miconfig = legalize_miconfig(merged)
 }
+
+// -------------------------------------------------------------------------
+// Conditional stack-pointer-swap primitives (forward declarations).
+//
+// The state (mspcs/sspcs) and the bodies of these primitives belong to the
+// Smcsps/Sscsps extension and are defined in extensions/Smcsps/smcsps.sail.
+// They are only declared here (in the shared ACLIC register module, which
+// is loaded `before sys`) so that the Smip/Ssip interrupt-handler push at
+// trap entry can call them without depending on the Smcsps module. When
+// Smcsps/Sscsps is not implemented the definitions reduce to a no-op, so
+// the interrupt push simply skips the stack-pointer swap.
+val xcsps_push_swap : Privilege -> unit
+val xcsps_pop_swap : Privilege -> unit
 

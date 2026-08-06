@@ -130,6 +130,7 @@ add_first_party_test("test_mtopi.S")
 add_first_party_override_test("test_smcsps.S" "smcsps.json")
 add_first_party_override_test("test_smijt.S" "smijt.json")
 add_first_party_override_test("test_smehv.S" "smehv.json")
+add_first_party_override_test("test_smip.S" "smip.json")
 
 add_first_party_override_test("test_smijt_ext.S" "smijt_ext.json")
 add_first_party_override_test("test_sew_elen_bound.S" "elen_32.json")

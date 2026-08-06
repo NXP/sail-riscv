@@ -409,6 +409,16 @@ extensions {
     files extensions/aclic/aclic_sys_control.sail
   }
 
+  // ACLIC: Interrupt handler push and pop (Smip/Ssip)
+  //
+  // Smip does not depend on Smcsps: the stack-pointer-swap primitives it
+  // calls are forward declared in aclic_regs and reduce to no-ops when
+  // Smcsps/Sscsps is not enabled, so the push simply skips the swap.
+  Smip {
+    requires core, sys, exceptions, aclic_regs, I
+    files extensions/aclic/smip.sail
+  }
+
   Zawrs {
     requires core
 
@@ -616,6 +626,7 @@ postlude {
   after extensions, mops, core
 
   requires prelude, core, sys, exceptions, Smcntrpmf, pmp, Zicfilp_regs, Zicfilp_insts
+
 
   files
     postlude/insts_end.sail,
