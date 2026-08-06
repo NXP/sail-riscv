@@ -14,11 +14,73 @@
 // current stack pointer (x2) with the alternate one, based on the
 // sppush/psppush bits in mistatus/sistatus.
 
+// The alternate stack pointers (mspcs/sspcs) and the shared conditional
+// stack-pointer-swap primitives live in this extension. They are forward
+// declared in aclic_regs.sail (loaded before sys) so that the Smip/Ssip
+// interrupt-handler push at trap entry can call them without depending on
+// this module; when Smcsps/Sscsps is not enabled the primitives are no-ops.
+
 // The alternate stack pointers. Full XLEN-wide WARL registers.
 register mspcs : xlenbits = zeros()
 register sspcs : xlenbits = zeros()
 
+// Access the per-privilege alternate stack pointer.
+function get_spcs(priv : Privilege) -> xlenbits =
+  match priv {
+    Supervisor => sspcs,
+    _          => mspcs,
+  }
+
+function set_spcs(priv : Privilege, v : xlenbits) -> unit =
+  match priv {
+    Supervisor => sspcs = v,
+    _          => mspcs = v,
+  }
+
+// Is the conditional-stack-pointer-swap extension enabled at `priv`?
+function csps_enabled(priv : Privilege) -> bool =
+  match priv {
+    Supervisor => currentlyEnabled(Ext_Sscsps),
+    _          => currentlyEnabled(Ext_Smcsps),
+  }
+
+// Push-mode swap: latch sppush into psppush and, if sppush is set, swap the
+// current stack pointer with the alternate one and clear sppush. When the
+// relevant extension is not enabled this is a no-op, matching the "viewed
+// as a NOP" wording of the Smip/Ssip spec, so a Smip/Ssip push without
+// Smcsps/Sscsps simply skips the stack-pointer swap.
+function xcsps_push_swap(priv : Privilege) -> unit = {
+  if csps_enabled(priv) then {
+    set_psppush(priv, get_sppush(priv));
+    if get_sppush(priv) == 0b1 then {
+      let tmp = X(sp);
+      X(sp) = get_spcs(priv);
+      set_spcs(priv, tmp);
+      set_sppush(priv, 0b0);
+    }
+  }
+}
+
+// Pop-mode swap: restore sppush from psppush and, if psppush is set, swap
+// the current stack pointer with the alternate one and clear psppush. This
+// is the exact inverse of xcsps_push_swap, so it is also used to unwind a
+// swap performed at interrupt trap entry when a subsequent push store
+// faults.
+function xcsps_pop_swap(priv : Privilege) -> unit = {
+  if csps_enabled(priv) then {
+    set_sppush(priv, get_psppush(priv));
+    if get_psppush(priv) == 0b1 then {
+      let tmp = get_spcs(priv);
+      set_spcs(priv, X(sp));
+      set_psppush(priv, 0b0);
+      X(sp) = tmp;
+    }
+  }
+}
+
 mapping clause csr_name_map = 0x349 <-> "mspcs"
+
+
 mapping clause csr_name_map = 0x149 <-> "sspcs"
 
 // Supervisor access to sspcs is additionally gated by the ACLIC bit
@@ -37,8 +99,10 @@ function clause write_CSR(0x149, value) = { sspcs = value; Ok(sspcs) }
 
 // The stack pointer register (x2) is the `sp` regidx defined in core/types.sail.
 
+
 // -------------------------------------------------------------------------
 // mcspspush - conditional stack pointer swap (push mode), machine level.
+
 // -------------------------------------------------------------------------
 union clause instruction = MCSPSPUSH : unit
 
@@ -50,16 +114,11 @@ function clause execute MCSPSPUSH() = {
   if   cur_privilege != Machine
   then Illegal_Instruction()
   else {
-    set_psppush(Machine, get_sppush(Machine));
-    if get_sppush(Machine) == 0b1 then {
-      let tmp = X(sp);
-      X(sp) = mspcs;
-      mspcs = tmp;
-      set_sppush(Machine, 0b0);
-    };
+    xcsps_push_swap(Machine);
     RETIRE_SUCCESS
   }
 }
+
 
 mapping clause assembly = MCSPSPUSH() <-> "mcspspush" ^ spc() ^ "sp" ^ sep() ^ "sp"
 
@@ -76,16 +135,11 @@ function clause execute MCSPSPOP() = {
   if   cur_privilege != Machine
   then Illegal_Instruction()
   else {
-    set_sppush(Machine, get_psppush(Machine));
-    if get_psppush(Machine) == 0b1 then {
-      let tmp = mspcs;
-      mspcs = X(sp);
-      set_psppush(Machine, 0b0);
-      X(sp) = tmp;
-    };
+    xcsps_pop_swap(Machine);
     RETIRE_SUCCESS
   }
 }
+
 
 mapping clause assembly = MCSPSPOP() <-> "mcspspop" ^ spc() ^ "sp" ^ sep() ^ "sp"
 
@@ -102,16 +156,11 @@ function clause execute SCSPSPUSH() = {
   if   not(cur_privilege == Machine | cur_privilege == Supervisor)
   then Illegal_Instruction()
   else {
-    set_psppush(Supervisor, get_sppush(Supervisor));
-    if get_sppush(Supervisor) == 0b1 then {
-      let tmp = X(sp);
-      X(sp) = sspcs;
-      sspcs = tmp;
-      set_sppush(Supervisor, 0b0);
-    };
+    xcsps_push_swap(Supervisor);
     RETIRE_SUCCESS
   }
 }
+
 
 mapping clause assembly = SCSPSPUSH() <-> "scspspush" ^ spc() ^ "sp" ^ sep() ^ "sp"
 
@@ -128,15 +177,10 @@ function clause execute SCSPSPOP() = {
   if   not(cur_privilege == Machine | cur_privilege == Supervisor)
   then Illegal_Instruction()
   else {
-    set_sppush(Supervisor, get_psppush(Supervisor));
-    if get_psppush(Supervisor) == 0b1 then {
-      let tmp = sspcs;
-      sspcs = X(sp);
-      set_psppush(Supervisor, 0b0);
-      X(sp) = tmp;
-    };
+    xcsps_pop_swap(Supervisor);
     RETIRE_SUCCESS
   }
 }
+
 
 mapping clause assembly = SCSPSPOP() <-> "scspspop" ^ spc() ^ "sp" ^ sep() ^ "sp"

@@ -197,6 +197,14 @@ function legalize_miconfig(v : Miconfig) -> Miconfig = {
   [Mk_Miconfig(zeros()) with mipu = m, sipu = s]
 }
 
+// Accessor used by the interrupt trap-entry logic: is push enabled at priv?
+function xiconfig_ipu(priv : Privilege) -> bits(1) =
+  match priv {
+    Machine    => miconfig[mipu],
+    Supervisor => miconfig[sipu],
+    _          => 0b0,
+  }
+
 mapping clause csr_name_map = 0x347 <-> "miconfig"
 mapping clause csr_name_map = 0x147 <-> "siconfig"
 
@@ -223,4 +231,17 @@ function clause write_CSR(0x147, value) = {
   miconfig = legalize_miconfig(merged);
   Ok(read_CSR(0x147))
 }
+
+// -------------------------------------------------------------------------
+// Conditional stack-pointer-swap primitives (forward declarations).
+//
+// The state (mspcs/sspcs) and the bodies of these primitives belong to the
+// Smcsps/Sscsps extension and are defined in extensions/Smcsps/smcsps.sail.
+// They are only declared here (in the shared ACLIC register module, which
+// is loaded `before sys`) so that the Smip/Ssip interrupt-handler push at
+// trap entry can call them without depending on the Smcsps module. When
+// Smcsps/Sscsps is not implemented the definitions reduce to a no-op, so
+// the interrupt push simply skips the stack-pointer swap.
+val xcsps_push_swap : Privilege -> unit
+val xcsps_pop_swap : Privilege -> unit
 

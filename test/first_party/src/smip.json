@@ -1,0 +1,10 @@
+{
+  "extensions": {
+    "Smcsps": {
+      "supported": true
+    },
+    "Smip": {
+      "supported": true
+    }
+  }
+}

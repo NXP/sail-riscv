@@ -304,8 +304,17 @@ function make_sync_exception(e : ExceptionType, xtval : xlenbits) -> sync_except
 function handle_exception(xtval : xlenbits, e : ExceptionType) -> unit =
   set_next_pc(exception_handler(cur_privilege, make_sync_exception(e, xtval), PC))
 
+// Smip/Ssip interrupt-handler push. Defined in extensions/aclic/smip.sail.
+// Returns Some(exc) if a push store faulted (interrupted context left intact,
+// so the fault is taken as a precise synchronous exception), else None().
+val try_interrupt_push : Privilege -> option(sync_exception)
+
 function handle_interrupt(i : InterruptType, del_priv : Privilege) -> unit =
-  set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None()))
+  match try_interrupt_push(del_priv) {
+    None()    => set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None())),
+    Some(exc) => set_next_pc(exception_handler(cur_privilege, exc, PC)),
+  }
+
 
 // Reset misa to enable the maximal set of supported extensions.
 function reset_misa() -> unit = {
