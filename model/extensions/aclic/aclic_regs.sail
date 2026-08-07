@@ -307,3 +307,31 @@ function clause write_CSR(0x107, value) = {
 val xcsps_push_swap : Privilege -> unit
 val xcsps_pop_swap : Privilege -> unit
 
+// -------------------------------------------------------------------------
+// ACLIC trap-entry hooks (forward declarations).
+//
+// Defined in the Smijt/Ssijt and Smip/Ssip extensions but declared here (in
+// the shared ACLIC register module, loaded `before sys`) so handle_interrupt
+// in sys/sys_control.sail can call them. try_interrupt_jumptable is a pure
+// lookup returning the jump-table handler address (Ok(Some) if vectored,
+// Ok(None) to use the direct vector, Err on a table-read fault). The
+// x*_ext_enabled predicates gate the ACLIC trap-entry path.
+val try_interrupt_jumptable : (Privilege, InterruptType) -> result(option(xlenbits), sync_exception)
+val xijt_ext_enabled : Privilege -> bool
+val xip_ext_enabled : Privilege -> bool
+
+// Smip/Ssip interrupt-handler push. Some(exc) if a push store faulted.
+val try_interrupt_push : Privilege -> option(sync_exception)
+
+
+// ACLIC interrupt trap entry (jump-table lookup + handler push + pending
+// clear), defined in extensions/aclic/aclic_sys_control.sail. handle_interrupt
+// takes this path only when aclic_trap_entry_active holds.
+val aclic_trap_entry_active : Privilege -> bool
+val handle_interrupt_aclic : (InterruptType, Privilege) -> unit
+
+
+
+
+
+

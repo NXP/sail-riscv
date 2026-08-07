@@ -304,16 +304,19 @@ function make_sync_exception(e : ExceptionType, xtval : xlenbits) -> sync_except
 function handle_exception(xtval : xlenbits, e : ExceptionType) -> unit =
   set_next_pc(exception_handler(cur_privilege, make_sync_exception(e, xtval), PC))
 
-// Smip/Ssip interrupt-handler push. Defined in extensions/aclic/smip.sail.
-// Returns Some(exc) if a push store faulted (interrupted context left intact,
-// so the fault is taken as a precise synchronous exception), else None().
-val try_interrupt_push : Privilege -> option(sync_exception)
-
+// Interrupt trap entry. Without any ACLIC trap-entry extension this just
+// enters the trap and takes the vector; otherwise the ACLIC path
+// (jump-table lookup, handler push, pending-bit clear) is taken, defined in
+// extensions/aclic/aclic_sys_control.sail.
 function handle_interrupt(i : InterruptType, del_priv : Privilege) -> unit =
-  match try_interrupt_push(del_priv) {
-    None()    => set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None())),
-    Some(exc) => set_next_pc(exception_handler(cur_privilege, exc, PC)),
-  }
+  if not(aclic_trap_entry_active(del_priv))
+  then set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None()))
+  else handle_interrupt_aclic(i, del_priv)
+
+
+
+
+
 
 
 // Reset misa to enable the maximal set of supported extensions.
