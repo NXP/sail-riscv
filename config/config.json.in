@@ -82,7 +82,24 @@
         "base_alignment": 2
       }
     },
+    // Base alignment of the interrupt jump-table base (mijt/sijt.BASE)
+    // for the Smijt/Ssijt extensions. The ACLIC specification fixes
+    // mijt/sijt.BASE at bits [XLEN-1:6], so the table base is at least
+    // 64-byte (2^6) aligned; the exact alignment above that is
+    // implementation-defined. As with `mtvec` above, the value is the
+    // power of 2 of the desired byte alignment, ranging from a minimum
+    // of 6 up to a maximum of 24. Writing an insufficiently aligned
+    // value zeroes the lowest BASE bits to respect the alignment.
+    // These values need to be present and legal even if Smijt/Ssijt is
+    // not supported, but are then ignored.
+    "mijt": {
+      "base_alignment": 6
+    },
+    "sijt": {
+      "base_alignment": 6
+    },
     "medeleg": {
+
       // A bit set to 1 in this value specifies that the corresponding
       // bit of `medeleg` can be set to 1. It represents the subset of
       // delegatable traps of the implementation. Bits should not be
@@ -784,6 +801,12 @@
       "supported": false
     },
     "Sscsps": {
+      "supported": false
+    },
+    "Smijt": {
+      "supported": false
+    },
+    "Ssijt": {
       "supported": false
     },
     // Enabling Sstvala requires that the exceptions specified in the extension

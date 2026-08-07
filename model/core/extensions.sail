@@ -570,6 +570,18 @@ mapping clause extensionName = Ext_Sscsps <-> "sscsps"
 function clause hartSupports(Ext_Sscsps) = (config extensions.Sscsps.supported : bool) & hartSupports(Ext_Smcsps) & hartSupports(Ext_S)
 function clause currentlyEnabled(Ext_Sscsps) = hartSupports(Ext_Sscsps) & currentlyEnabled(Ext_S)
 
+
+// Interrupt jump table / hardware vectoring (machine level)
+enum clause extension = Ext_Smijt
+mapping clause extensionName = Ext_Smijt <-> "smijt"
+function clause hartSupports(Ext_Smijt) = config extensions.Smijt.supported
+function clause currentlyEnabled(Ext_Smijt) = hartSupports(Ext_Smijt)
+// Interrupt jump table / hardware vectoring (supervisor level)
+enum clause extension = Ext_Ssijt
+mapping clause extensionName = Ext_Ssijt <-> "ssijt"
+function clause hartSupports(Ext_Ssijt) = (config extensions.Ssijt.supported : bool) & hartSupports(Ext_Smijt) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssijt) = hartSupports(Ext_Ssijt) & currentlyEnabled(Ext_S)
+
 // QoS identifiers
 enum clause extension = Ext_Ssqosid
 mapping clause extensionName = Ext_Ssqosid <-> "ssqosid"
@@ -879,9 +891,11 @@ let extensions_ordered_for_isa_string = [
   Ext_Smaia,
   Ext_Smcntrpmf,
   Ext_Smcsps,
+  Ext_Smijt,
   Ext_Smcsrind,
   Ext_Smmpm,
   Ext_Smnpm,
   Ext_Smstateen,
   Ext_Sscsps,
+  Ext_Ssijt,
 ]

@@ -76,7 +76,8 @@ function set_mtvec(value : xlenbits) -> xlenbits = {
                         plat_mtvec_direct_mode_supported,
                         plat_mtvec_direct_base_alignment_exp,
                         plat_mtvec_vectored_mode_supported,
-                        plat_mtvec_vectored_base_alignment_exp);
+                        plat_mtvec_vectored_base_alignment_exp,
+                        currentlyEnabled(Ext_Smijt));
   mtvec.bits
 }
 
@@ -86,7 +87,8 @@ function set_stvec(value : xlenbits) -> xlenbits = {
                         plat_stvec_direct_mode_supported,
                         2,
                         plat_stvec_vectored_mode_supported,
-                        plat_stvec_vectored_base_alignment_exp);
+                        plat_stvec_vectored_base_alignment_exp,
+                        currentlyEnabled(Ext_Ssijt));
   stvec.bits
 }
 

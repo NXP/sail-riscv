@@ -308,8 +308,14 @@ function make_sync_exception(e : ExceptionType, xtval : xlenbits) -> sync_except
 function handle_exception(xtval : xlenbits, e : ExceptionType) -> unit =
   set_next_pc(exception_handler(cur_privilege, make_sync_exception(e, xtval), PC))
 
+// Interrupt trap entry. Without any ACLIC trap-entry extension this just
+// enters the trap and takes the vector; otherwise the ACLIC path
+// (jump-table lookup, handler push, pending-bit clear) is taken, defined in
+// extensions/aclic/aclic_sys_control.sail.
 function handle_interrupt(i : InterruptType, del_priv : Privilege) -> unit =
-  set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None()))
+  if not(aclic_trap_entry_active(del_priv))
+  then set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None()))
+  else handle_interrupt_aclic(i, del_priv)
 
 // Reset misa to enable the maximal set of supported extensions.
 function reset_misa() -> unit = {

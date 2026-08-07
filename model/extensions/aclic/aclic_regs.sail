@@ -160,4 +160,87 @@ function clause read_CSR(0x346) = get_mistatus()
 function clause read_CSR(0x146) = get_sistatus()
 
 function clause write_CSR(0x346, value) = { set_mistatus(value); Ok(get_mistatus()) }
-function clause write_CSR(0x146, value) = { set_sistatus(value); Ok(get_sistatus()) }
+
+// -------------------------------------------------------------------------
+// mijt / sijt - interrupt jump-table base CSRs (Smijt/Ssijt).
+//
+// When xtvec.MODE == 0b11 (jump-table mode) an interrupt delegated to
+// privilege x vectors through a table based at xijt. The CSR layout is
+// (from the ACLIC specification):
+//   BASE  [XLEN-1:6]  WARL  64-byte-aligned table base
+//   resv  [5:2]       WARL  reserved (read-only zero)
+//   SHAMT [1:0]       WARL  extra left-shift applied to the table index
+// CSR addresses: mijt = 0x307, sijt = 0x107.
+bitfield Xijt : xlenbits = {
+  BASE  : xlen - 1 .. 6,
+  SHAMT : 1 .. 0,
+}
+
+register mijt : Xijt = Mk_Xijt(zeros())
+register sijt : Xijt = Mk_Xijt(zeros())
+
+// WARL legalization: keep only BASE and SHAMT; the reserved bits [5:2] are
+// forced to zero. The table base is at least 64-byte (2^6) aligned because
+// BASE occupies bits [XLEN-1:6]; if the platform mandates a coarser
+// alignment (align_exp > 6) the additional low BASE bits are also zeroed,
+// analogous to legalize_tvec zeroing the low bits of the trap-vector base.
+function legalize_xijt(v : Xijt, align_exp : ijt_alignment) -> Xijt = {
+  let v = [Mk_Xijt(zeros()) with BASE = v[BASE], SHAMT = v[SHAMT]];
+  // BASE starts at bit 6, so an alignment exponent of `align_exp` zeros the
+  // lowest (align_exp - 6) bits of the BASE field.
+  if align_exp > 6
+  then [v with BASE = [v[BASE] with (align_exp - 7) .. 0 = zeros()]]
+  else v
+}
+
+
+// Accessor used by the jump-table vectoring logic: the xijt value for priv.
+function get_xijt(priv : Privilege) -> Xijt =
+  match priv {
+    Machine    => mijt,
+    Supervisor => sijt,
+    _          => Mk_Xijt(zeros()),
+  }
+
+mapping clause csr_name_map = 0x307 <-> "mijt"
+mapping clause csr_name_map = 0x107 <-> "sijt"
+
+function clause is_CSR_accessible(0x307, priv, _) =
+  currentlyEnabled(Ext_Smijt) & priv == Machine
+function clause is_CSR_accessible(0x107, priv, _) =
+  currentlyEnabled(Ext_Ssijt) & (priv == Machine | priv == Supervisor)
+
+function clause read_CSR(0x307) = mijt.bits
+function clause read_CSR(0x107) = sijt.bits
+
+function clause write_CSR(0x307, value) = {
+  mijt = legalize_xijt(Mk_Xijt(value), plat_mijt_base_alignment_exp);
+  Ok(mijt.bits)
+}
+function clause write_CSR(0x107, value) = {
+  sijt = legalize_xijt(Mk_Xijt(value), plat_sijt_base_alignment_exp);
+  Ok(sijt.bits)
+}
+
+// -------------------------------------------------------------------------
+// ACLIC trap-entry hooks.
+//
+// try_interrupt_jumptable and xijt_ext_enabled are defined by the Smijt/Ssijt
+// extension (extensions/aclic/smijt.sail). aclic_trap_entry_active and
+// handle_interrupt_aclic are defined in extensions/aclic/aclic_sys_control.sail.
+// They are declared here (in the shared ACLIC register module, loaded
+// `before sys`) so handle_interrupt in sys/sys_control.sail can call them.
+val try_interrupt_jumptable : (Privilege, InterruptType) -> result(option(xlenbits), sync_exception)
+val xijt_ext_enabled : Privilege -> bool
+
+val aclic_trap_entry_active : Privilege -> bool
+val handle_interrupt_aclic : (InterruptType, Privilege) -> unit
+
+// Smip/Ssip interrupt-handler push hooks. The real bodies live in the
+// Smip/Ssip extension (extensions/aclic/smip.sail), which depends on the
+// indirect-CSR miconfig and is therefore not part of this base layer. Until
+// that extension is present these reduce to no-ops: no handler-stack push is
+// performed and the ACLIC trap-entry path is gated purely by jump-table
+// vectoring (xijt_ext_enabled).
+function xip_ext_enabled(priv : Privilege) -> bool = false
+function try_interrupt_push(priv : Privilege) -> option(sync_exception) = None()

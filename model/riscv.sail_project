@@ -366,15 +366,36 @@ extensions {
 
   // ACLIC: shared interrupt-status CSR state (mistatus/sistatus)
   aclic_regs {
-    requires core
+    requires core, exceptions
     before sys
     files extensions/aclic/aclic_regs.sail
   }
+
 
   // ACLIC: Conditional Stack Pointer Swap (Smcsps/Sscsps)
   Smcsps {
     requires core, sys, aclic_regs
     files extensions/Smcsps/smcsps.sail
+  }
+
+  // ACLIC: Interrupt jump-table (hardware vectoring) (Smijt/Ssijt)
+  //
+  // The jump-table lookup entry point try_interrupt_jumptable is forward
+  // declared in aclic_regs so handle_interrupt can call it, and reduces to
+  // Ok(None()) when the extension is not enabled.
+  Smijt {
+    requires core, sys, exceptions, aclic_regs, I
+    files extensions/aclic/smijt.sail
+  }
+
+  // ACLIC: interrupt trap-entry driver (handle_interrupt_aclic).
+  //
+  // Loaded after sys because it calls sys trap primitives (trap_handler,
+  // exception_handler, set_next_pc); its entry points are forward declared
+  // in aclic_regs so handle_interrupt in sys can delegate to it.
+  aclic_sys_control {
+    requires core, sys, exceptions, aclic_regs
+    files extensions/aclic/aclic_sys_control.sail
   }
 
   Zawrs {
