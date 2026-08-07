@@ -581,6 +581,17 @@ mapping clause extensionName = Ext_Ssip <-> "ssip"
 function clause hartSupports(Ext_Ssip) = (config extensions.Ssip.supported : bool) & hartSupports(Ext_Smip) & hartSupports(Ext_S)
 function clause currentlyEnabled(Ext_Ssip) = hartSupports(Ext_Ssip) & currentlyEnabled(Ext_S)
 
+// Interrupt jump table / hardware vectoring (machine level)
+enum clause extension = Ext_Smijt
+mapping clause extensionName = Ext_Smijt <-> "smijt"
+function clause hartSupports(Ext_Smijt) = config extensions.Smijt.supported
+function clause currentlyEnabled(Ext_Smijt) = hartSupports(Ext_Smijt)
+// Interrupt jump table / hardware vectoring (supervisor level)
+enum clause extension = Ext_Ssijt
+mapping clause extensionName = Ext_Ssijt <-> "ssijt"
+function clause hartSupports(Ext_Ssijt) = (config extensions.Ssijt.supported : bool) & hartSupports(Ext_Smijt) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssijt) = hartSupports(Ext_Ssijt) & currentlyEnabled(Ext_S)
+
 
 // QoS identifiers
 enum clause extension = Ext_Ssqosid
@@ -860,11 +871,13 @@ let extensions_ordered_for_isa_string = [
   // Machine mode extensions, ordered alphabetically.
   Ext_Smcntrpmf,
   Ext_Smcsps,
+  Ext_Smijt,
   Ext_Smip,
   Ext_Smmpm,
   Ext_Smnpm,
   Ext_Smstateen,
   Ext_Sscsps,
+  Ext_Ssijt,
   Ext_Ssip,
 ]
 
