@@ -582,6 +582,19 @@ mapping clause extensionName = Ext_Ssijt <-> "ssijt"
 function clause hartSupports(Ext_Ssijt) = (config extensions.Ssijt.supported : bool) & hartSupports(Ext_Smijt) & hartSupports(Ext_S)
 function clause currentlyEnabled(Ext_Ssijt) = hartSupports(Ext_Ssijt) & currentlyEnabled(Ext_S)
 
+// Synchronous exception hardware vectoring (machine level)
+enum clause extension = Ext_Smehv
+mapping clause extensionName = Ext_Smehv <-> "smehv"
+function clause hartSupports(Ext_Smehv) = (config extensions.Smehv.supported : bool) & hartSupports(Ext_Smijt)
+function clause currentlyEnabled(Ext_Smehv) = hartSupports(Ext_Smehv) & currentlyEnabled(Ext_Smijt)
+// Synchronous exception hardware vectoring (supervisor level)
+enum clause extension = Ext_Ssehv
+mapping clause extensionName = Ext_Ssehv <-> "ssehv"
+function clause hartSupports(Ext_Ssehv) = (config extensions.Ssehv.supported : bool) & hartSupports(Ext_Smehv) & hartSupports(Ext_Ssijt) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssehv) = hartSupports(Ext_Ssehv) & currentlyEnabled(Ext_Ssijt) & currentlyEnabled(Ext_S)
+
+
+
 // QoS identifiers
 enum clause extension = Ext_Ssqosid
 mapping clause extensionName = Ext_Ssqosid <-> "ssqosid"
@@ -709,6 +722,9 @@ function currentlyEnabled_measure(ext : extension) -> int =
     Ext_Zvfbfmin => 3, // > Zve32f
     Ext_Zvkb => 3, // > Zvbb
     Ext_Zvknhb => 3, // > Zve64x
+    Ext_Smehv => 3, // > Smijt
+    Ext_Ssehv => 3, // > Ssijt
+
 
     Ext_H => 4, // > virtual_mem_supported
     Ext_Zve64d => 4, // > Zve64f
@@ -891,11 +907,15 @@ let extensions_ordered_for_isa_string = [
   Ext_Smaia,
   Ext_Smcntrpmf,
   Ext_Smcsps,
+  Ext_Smehv,
   Ext_Smijt,
   Ext_Smcsrind,
   Ext_Smmpm,
   Ext_Smnpm,
   Ext_Smstateen,
   Ext_Sscsps,
+  Ext_Ssehv,
   Ext_Ssijt,
 ]
+
+

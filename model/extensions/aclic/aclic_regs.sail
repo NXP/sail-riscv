@@ -168,30 +168,39 @@ function clause write_CSR(0x346, value) = { set_mistatus(value); Ok(get_mistatus
 // privilege x vectors through a table based at xijt. The CSR layout is
 // (from the ACLIC specification):
 //   BASE  [XLEN-1:6]  WARL  64-byte-aligned table base
-//   resv  [5:2]       WARL  reserved (read-only zero)
+//   resv  [5:3]       WARL  reserved (read-only zero)
+//   EHV   [2]         WARL  synchronous exception hardware-vectoring enable
+//                          (Smehv/Ssehv); reserved (read-only zero) otherwise
 //   SHAMT [1:0]       WARL  extra left-shift applied to the table index
 // CSR addresses: mijt = 0x307, sijt = 0x107.
 bitfield Xijt : xlenbits = {
   BASE  : xlen - 1 .. 6,
+  EHV   : 2,
   SHAMT : 1 .. 0,
 }
+
 
 register mijt : Xijt = Mk_Xijt(zeros())
 register sijt : Xijt = Mk_Xijt(zeros())
 
-// WARL legalization: keep only BASE and SHAMT; the reserved bits [5:2] are
-// forced to zero. The table base is at least 64-byte (2^6) aligned because
+// WARL legalization: keep only BASE, SHAMT and (when synchronous exception
+// hardware vectoring is supported for this privilege) EHV; the reserved
+// bits [5:3] are forced to zero. When Smehv/Ssehv is not supported EHV is
+// also read-only zero, so `ehv_supported` gates whether the written EHV bit
+// is preserved. The table base is at least 64-byte (2^6) aligned because
 // BASE occupies bits [XLEN-1:6]; if the platform mandates a coarser
 // alignment (align_exp > 6) the additional low BASE bits are also zeroed,
 // analogous to legalize_tvec zeroing the low bits of the trap-vector base.
-function legalize_xijt(v : Xijt, align_exp : ijt_alignment) -> Xijt = {
-  let v = [Mk_Xijt(zeros()) with BASE = v[BASE], SHAMT = v[SHAMT]];
+function legalize_xijt(v : Xijt, align_exp : ijt_alignment, ehv_supported : bool) -> Xijt = {
+  let ehv = if ehv_supported then v[EHV] else 0b0;
+  let v = [Mk_Xijt(zeros()) with BASE = v[BASE], EHV = ehv, SHAMT = v[SHAMT]];
   // BASE starts at bit 6, so an alignment exponent of `align_exp` zeros the
   // lowest (align_exp - 6) bits of the BASE field.
   if align_exp > 6
   then [v with BASE = [v[BASE] with (align_exp - 7) .. 0 = zeros()]]
   else v
 }
+
 
 
 // Accessor used by the jump-table vectoring logic: the xijt value for priv.
@@ -214,13 +223,15 @@ function clause read_CSR(0x307) = mijt.bits
 function clause read_CSR(0x107) = sijt.bits
 
 function clause write_CSR(0x307, value) = {
-  mijt = legalize_xijt(Mk_Xijt(value), plat_mijt_base_alignment_exp);
+  mijt = legalize_xijt(Mk_Xijt(value), plat_mijt_base_alignment_exp, hartSupports(Ext_Smehv));
   Ok(mijt.bits)
 }
 function clause write_CSR(0x107, value) = {
-  sijt = legalize_xijt(Mk_Xijt(value), plat_sijt_base_alignment_exp);
+  sijt = legalize_xijt(Mk_Xijt(value), plat_sijt_base_alignment_exp, hartSupports(Ext_Ssehv));
   Ok(sijt.bits)
 }
+
+
 
 // -------------------------------------------------------------------------
 // ACLIC trap-entry hooks.
@@ -233,6 +244,22 @@ function clause write_CSR(0x107, value) = {
 val try_interrupt_jumptable : (Privilege, InterruptType) -> result(option(xlenbits), sync_exception)
 val xijt_ext_enabled : Privilege -> bool
 
+// Smip/Ssip interrupt-handler push. Some(exc) if a push store faulted.
+val try_interrupt_push : Privilege -> option(sync_exception)
+
+// Smehv/Ssehv synchronous exception hardware-vectoring hook, defined in
+// extensions/aclic/smehv.sail but declared here so trap_handler in
+// sys/sys_control.sail can consult it when computing the trap vector.
+// Returns Some(handler) when the trap being taken is a synchronous
+// exception, xtvec is in jump-table mode, and xijt.EHV is set for the
+// delegated privilege; None() to fall back to the normal trap vector.
+val smehv_exc_vector : (Privilege, Mcause) -> option(xlenbits)
+
+
+
+// ACLIC interrupt trap entry (jump-table lookup + handler push + pending
+// clear), defined in extensions/aclic/aclic_sys_control.sail. handle_interrupt
+// takes this path only when aclic_trap_entry_active holds.
 val aclic_trap_entry_active : Privilege -> bool
 val handle_interrupt_aclic : (InterruptType, Privilege) -> unit
 

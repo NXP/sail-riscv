@@ -64,7 +64,7 @@ pmp {
 }
 
 sys {
-  requires prelude, core, exceptions, pmp, V_core, Smcntrpmf, Zicfilp_regs, A_types, Stateen, Zicbop_types, PM_utils
+  requires prelude, core, exceptions, pmp, V_core, Smcntrpmf, Zicfilp_regs, A_types, Stateen, Zicbop_types, PM_utils, aclic_regs
 
   files
     sys/sys_reservation.sail,
@@ -386,6 +386,17 @@ extensions {
   Smijt {
     requires core, sys, exceptions, aclic_regs, I
     files extensions/aclic/smijt.sail
+  }
+
+  // ACLIC: Synchronous exception hardware vectoring (Smehv/Ssehv)
+  //
+  // Vectors a synchronous exception through OBASE + 4*exccode when xtvec is
+  // in jump-table mode and xijt.EHV is set. The smehv_exc_vector hook is
+  // forward declared in aclic_regs so trap_handler in sys can consult it.
+  // Requires Smijt because it reuses the xtvec_for helper defined there.
+  Smehv {
+    requires core, sys, exceptions, aclic_regs, Smijt
+    files extensions/aclic/smehv.sail
   }
 
   // ACLIC: interrupt trap-entry driver (handle_interrupt_aclic).

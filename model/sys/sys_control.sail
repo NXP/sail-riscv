@@ -226,7 +226,12 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
 
       track_trap(del_priv, is_interrupt, cause);
 
-      prepare_trap_vector(del_priv, mcause)
+      // Smehv/Ssehv: a synchronous exception may be hardware-vectored via
+      // xijt.EHV; fall back to the normal trap vector otherwise.
+      match smehv_exc_vector(del_priv, mcause) {
+        Some(v) => v,
+        None()  => prepare_trap_vector(del_priv, mcause),
+      }
     },
     Supervisor => {
       assert (currentlyEnabled(Ext_S), "no supervisor mode present for delegation");
@@ -252,7 +257,12 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
 
       track_trap(del_priv, is_interrupt, cause);
 
-      prepare_trap_vector(del_priv, scause)
+      // Smehv/Ssehv: a synchronous exception may be hardware-vectored via
+      // xijt.EHV; fall back to the normal trap vector otherwise.
+      match smehv_exc_vector(del_priv, scause) {
+        Some(v) => v,
+        None()  => prepare_trap_vector(del_priv, scause),
+      }
     },
     User              => internal_error(__FILE__, __LINE__, "Invalid privilege level"),
     VirtualUser       => internal_error(__FILE__, __LINE__, "Hypervisor extension not supported"),

@@ -1,0 +1,10 @@
+{
+  "extensions": {
+    "Smijt": {
+      "supported": true
+    },
+    "Smehv": {
+      "supported": true
+    }
+  }
+}
