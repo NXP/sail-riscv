@@ -576,6 +576,18 @@ mapping clause extensionName = Ext_Sscsrind <-> "sscsrind"
 function clause hartSupports(Ext_Sscsrind) = (config extensions.Sscsrind.supported : bool) & hartSupports(Ext_S)
 function clause currentlyEnabled(Ext_Sscsrind) = hartSupports(Ext_Sscsrind) & currentlyEnabled(Ext_S)
 
+// Advanced Interrupt Architecture, machine level.
+enum clause extension = Ext_Smaia
+mapping clause extensionName = Ext_Smaia <-> "smaia"
+function clause hartSupports(Ext_Smaia) = (config extensions.Smaia.supported : bool) & hartSupports(Ext_Smcsrind)
+function clause currentlyEnabled(Ext_Smaia) = hartSupports(Ext_Smaia) & currentlyEnabled(Ext_Smcsrind)
+
+// Advanced Interrupt Architecture, supervisor level.
+enum clause extension = Ext_Ssaia
+mapping clause extensionName = Ext_Ssaia <-> "ssaia"
+function clause hartSupports(Ext_Ssaia) = (config extensions.Ssaia.supported : bool) & hartSupports(Ext_Smaia) & hartSupports(Ext_Sscsrind)
+function clause currentlyEnabled(Ext_Ssaia) = hartSupports(Ext_Ssaia) & currentlyEnabled(Ext_Sscsrind)
+
 // Environment extensions
 
 // These extensions are not configurable via the config file
@@ -612,6 +624,8 @@ function hartSupports_measure(ext : extension) -> int =
     Ext_Zvkng => 2, // > Zvkn
     Ext_Zvksc => 2, // > Zvks
     Ext_Zvksg => 2, // > Zvks
+    Ext_Smaia => 2, // > Smcsrind
+    Ext_Ssaia => 3, // > Smaia, Sscsrind
 
     _ => 0,
   }
@@ -826,6 +840,7 @@ let extensions_ordered_for_isa_string = [
   Ext_Zvl1024b,
 
   // Supervisor extensions, ordered alphabetically.
+  Ext_Ssaia,
   Ext_Ssccptr,
   Ext_Sscsrind,
   Ext_Sscofpmf,
@@ -850,10 +865,10 @@ let extensions_ordered_for_isa_string = [
   // Hypervisor extensions, ordered alphabetically.
 
   // Machine mode extensions, ordered alphabetically.
+  Ext_Smaia,
   Ext_Smcntrpmf,
   Ext_Smcsrind,
   Ext_Smmpm,
   Ext_Smnpm,
   Ext_Smstateen,
 ]
-

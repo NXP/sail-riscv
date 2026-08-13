@@ -83,17 +83,21 @@ function exception_delegatee(e : ExceptionType, p : Privilege) -> Privilege = {
 // "Multiple simultaneous interrupts destined for M-mode are handled
 // in the following decreasing priority order: MEI, MSI, MTI, SEI,
 // SSI, STI, LCOFI."
+//
+// This uses the base priority selector (`highest_priority_pending_interrupt`
+// in `core/interrupt_regs.sail`), which is also reused by the AIA
+// mtopi/stopi identity selection, so the trap-arbitration order and the top
+// interrupt CSRs share a single source of truth without the base
+// arbitration depending on any extension. The `ip` passed here is already
+// masked to the active (pending & enabled & !delegated) set for the
+// privilege being dispatched.
 function findPendingInterrupt(ip : xlenbits) -> option(InterruptType) = {
-  let ip = Mk_Minterrupts(ip);
-  if      ip[MEI] == 0b1 then Some(I_M_External)
-  else if ip[MSI] == 0b1 then Some(I_M_Software)
-  else if ip[MTI] == 0b1 then Some(I_M_Timer)
-  else if ip[SEI] == 0b1 then Some(I_S_External)
-  else if ip[SSI] == 0b1 then Some(I_S_Software)
-  else if ip[STI] == 0b1 then Some(I_S_Timer)
-  else if ip[LCOFI] == 0b1 then Some(I_COF)
-  else                        None()
+  match highest_priority_pending_interrupt(Mk_Minterrupts(ip)) {
+    None()  => None(),
+    Some(i) => Some(interruptType_bits(to_bits(6, i))),
+  }
 }
+
 
 // Given the current privilege level, return the pending set
 // of interrupts for the highest privilege that has any pending.
