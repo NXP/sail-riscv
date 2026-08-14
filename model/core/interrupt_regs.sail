@@ -26,6 +26,48 @@ bitfield Minterrupts : xlenbits = {
   SSI  : 1,  // Supervisor software interrupt
 }
 
+// The standard interrupt priority order from the privileged
+// specification: "Multiple simultaneous interrupts destined for M-mode
+// are handled in the following decreasing priority order: MEI, MSI, MTI,
+// SEI, SSI, STI, LCOFI."
+//
+// This is base RISC-V behaviour, used both by the trap-dispatch path
+// (sys/sys_control.sail:findPendingInterrupt) and, when AIA is present, by
+// the mtopi/stopi identity selection (core/aia_regs.sail). Keeping it here
+// in the base gives a single source of truth without the base interrupt
+// arbitration depending on any extension.
+//
+// The rank is the position in the default order (0 = highest priority).
+function interrupt_priority_rank(iid : range(0, 63)) -> range(0, 7) =
+  match iid {
+    11 => 0, // MEI
+    3  => 1, // MSI
+    7  => 2, // MTI
+    9  => 3, // SEI
+    1  => 4, // SSI
+    5  => 5, // STI
+    13 => 6, // LCOFI
+    _  => 7, // not an arbitrated interrupt
+  }
+
+// Returns the highest-priority set bit in the given active
+// (pending-and-enabled) interrupt set, using the standard interrupt
+// priority order, restricted to the standard major interrupts. Returns
+// None if the set contains none of them. Callers pass the already-masked
+// bits appropriate to the privilege level being arbitrated.
+function highest_priority_pending_interrupt(active : Minterrupts) -> option(range(0, 63)) = {
+  let p = active.bits;
+  if      p[11] == bitone then Some(11) // MEI
+  else if p[3]  == bitone then Some(3)  // MSI
+  else if p[7]  == bitone then Some(7)  // MTI
+  else if p[9]  == bitone then Some(9)  // SEI
+  else if p[1]  == bitone then Some(1)  // SSI
+  else if p[5]  == bitone then Some(5)  // STI
+  else if p[13] == bitone then Some(13) // LCOFI
+  else None()
+}
+
+
 private function legalize_mip(o : Minterrupts, v : xlenbits) -> Minterrupts = {
   // The only writable bits are the S-mode bits.
   let v = Mk_Minterrupts(v);

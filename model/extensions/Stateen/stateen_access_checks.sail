@@ -57,6 +57,12 @@ function stateen_allows_CSR_access(csr : csreg, priv : Privilege, _access_type :
     (0x150, priv) => check_stateen_bit(priv, STATEEN_CSRIND, 0),
     (0x151, priv) => check_stateen_bit(priv, STATEEN_CSRIND, 0),
 
+    // Supervisor-level AIA (Ssaia) CSRs are gated by mstateen0.AIA
+    // (bit 59): stopi and the RV32 high-half CSRs sieh / siph.
+    (0xDB0, priv) => check_stateen_bit(priv, STATEEN_AIA, 0),
+    (0x114, priv) => check_stateen_bit(priv, STATEEN_AIA, 0),
+    (0x154, priv) => check_stateen_bit(priv, STATEEN_AIA, 0),
+
     // fflags
     (0x001, priv) => if hartSupports(Ext_Zfinx) then check_stateen_bit(priv, STATEEN_FCSR, 0) else true,
     // frm

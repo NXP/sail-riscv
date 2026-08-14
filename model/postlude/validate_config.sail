@@ -608,8 +608,42 @@ private function check_stateen_config() -> bool = {
   valid
 }
 
+private function check_aia_config() -> bool = {
+  if not(config extensions.Smaia.supported : bool) then return true;
+  var valid : bool = true;
+  // Smaia requires the machine-level indirect CSR access framework.
+  if not(config extensions.Smcsrind.supported : bool) then {
+    valid = false;
+    print_endline("The Smaia extension is enabled but Smcsrind is disabled: Smaia requires Smcsrind.");
+  };
+  // Ssaia requires Smaia and the supervisor-level indirect CSR framework.
+  if (config extensions.Ssaia.supported : bool) then {
+    if not(config extensions.S.supported : bool) then {
+      valid = false;
+      print_endline("The Ssaia extension is enabled but supervisor mode (S) is disabled: Ssaia requires S.");
+    };
+    if not(config extensions.Sscsrind.supported : bool) then {
+      valid = false;
+      print_endline("The Ssaia extension is enabled but Sscsrind is disabled: Ssaia requires Sscsrind.");
+    };
+  };
+  // The iprio arrays being read-only zero is currently the only supported
+  // configuration.
+  if not(config extensions.Smaia.iprio_read_only_zero : bool) then {
+    valid = false;
+    print_endline("`extensions.Smaia.iprio_read_only_zero` is false but the only supported setting is `true`: the iprio arrays must be read-only zero.");
+  };
+  // Iprio_FixedOne reporting requires the iprio arrays to be read-only zero.
+  if plat_aia_iprio_reporting == Iprio_FixedOne & not(config extensions.Smaia.iprio_read_only_zero : bool) then {
+    valid = false;
+    print_endline("`extensions.Smaia.iprio_reporting` is `Iprio_FixedOne` but `extensions.Smaia.iprio_read_only_zero` is false: fixed-one reporting requires the iprio arrays to be read-only zero.");
+  };
+  valid
+}
+
 private function check_mmio_devices() -> bool = {
   var valid : bool = true;
+
   if plat_sig_base[1 .. 0] != zeros() then {
     valid = false;
     print_endline("platform.simple_interrupt_generator.base is not 4-byte aligned.");
@@ -699,4 +733,5 @@ function config_is_valid() -> bool = {
   & check_extension_param_constraints()
   & check_version_constraints()
   & check_stateen_config()
+  & check_aia_config()
 }

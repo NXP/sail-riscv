@@ -865,6 +865,27 @@
     // Supervisor-level indirect CSR access (siselect/sireg). Required by Ssaia.
     "Sscsrind": {
       "supported": true
+    },
+    // Advanced Interrupt Architecture, machine level. Requires Smcsrind.
+    "Smaia": {
+      "supported": true,
+      // Whether all iprio array values for the major interrupts are
+      // read-only zero. This is currently the only supported setting,
+      // so this must be `true`.
+      "iprio_read_only_zero": true,
+      // How the top interrupt priority is reported by mtopi/stopi when
+      // the corresponding iprio array is all zero. There are two options:
+      //
+      // - "Iprio_FixedOne": the reported priority number is fixed at 1.
+      //   This requires `iprio_read_only_zero` to be `true`.
+      // - "Iprio_Iprio": the reported priority follows the rules
+      //   established by the AIA specification, derived from the iprio
+      //   array. This requires the extended Simple Interrupt Generator.
+      "iprio_reporting": "Iprio_FixedOne"
+    },
+    // Advanced Interrupt Architecture, supervisor level. Requires Smaia and Sscsrind.
+    "Ssaia": {
+      "supported": true
     }
   }
 }

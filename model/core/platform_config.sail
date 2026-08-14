@@ -200,3 +200,20 @@ enum FflagsDirtyPolicy = {
 }
 
 let fflags_dirty_policy : FflagsDirtyPolicy = config extensions.F.fflags_dirty_policy
+
+// How the top interrupt priority is reported by mtopi/stopi (Smaia). See
+// model/core/aia_regs.sail and the AIA specification for details.
+enum IprioReporting = {
+  // The reported priority number is fixed at 1 whenever a top interrupt
+  // exists. Requires the iprio arrays to be read-only zero.
+  Iprio_FixedOne,
+  // The reported priority follows the AIA rules derived from the iprio
+  // array. Requires the extended Simple Interrupt Generator.
+  Iprio_Iprio,
+}
+
+// Whether all iprio array values for the major interrupts are read-only
+// zero. This is currently the only supported setting.
+let plat_aia_iprio_read_only_zero : bool = config extensions.Smaia.iprio_read_only_zero
+
+let plat_aia_iprio_reporting : IprioReporting = config extensions.Smaia.iprio_reporting

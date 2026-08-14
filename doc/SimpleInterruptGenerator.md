@@ -2,20 +2,22 @@
 
 This model includes a very simple MMIO device that allows setting interrupts that are difficult to set via other means (through software or CLINT). This is intended for testing purposes.
 
-This describes version 1.0 of the device. Future versions may add additional features but will be backwards compatible.
+This describes version 1.1 of the device. Future versions may add additional features but will be backwards compatible.
 
 ## Memory Layout
 
 The device consists only of 4-byte registers, and it must be 4-byte aligned.
 Only naturally aligned 4-byte accesses succeed. Other accesses raise an access fault.
 
-| Offset (Bytes) | Size (Bytes) | Register   | Read    | Write                |
-| -------------- | ------------ | ---------- | ------- | -------------------- |
-| 0              | 4            | `version`  | Version | _ignored_            |
-| 4              | 4            | `platform` | _zeros_ | Set/clear interrupts |
-| 8              | 24           | _reserved_ | _fault_ | _fault_              |
+| Offset (Bytes) | Size (Bytes) | Register     | Read         | Write                |
+| -------------- | ------------ | ------------ | ------------ | -------------------- |
+| 0              | 4            | `version`    | Version      | _ignored_            |
+| 4              | 4            | `platform`   | _zeros_      | Set/clear interrupts |
+| 8              | 4            | `mtopei_cfg` | Config value | Set MEI id/priority  |
+| 12             | 4            | `stopei_cfg` | Config value | Set SEI id/priority  |
+| 16             | 16           | _reserved_   | _fault_      | _fault_              |
 
-`version`: reads as as the current version (0x00010000 currently). The version is split into major/minor 16-bit integers, so the current version is 1.0. Versioning follows semver, so minor version updates are backwards compatible with existing software, major version updates are not. Writes to `version` are ignored.
+`version`: reads as as the current version (0x00010001 currently). The version is split into major/minor 16-bit integers, so the current version is 1.1. Versioning follows semver, so minor version updates are backwards compatible with existing software, major version updates are not. Writes to `version` are ignored.
 
 `platform`: reads as 0. Writes can be used to set or clear platform-generated interrupts as follows:
 
@@ -44,7 +46,22 @@ Setting or clearing SSI updates the value in `mip[SSI]`, but in this case there 
 
 Note that if the target hart does not support supervisor mode then `mip[SSI]` and `mip[SEI]` must be read-only zero. Attempts to set `mip[SSI]` will be ignored. Attempts to set `SEI` _will_ set the external platform interrupt input, but it will not be visible in `mip` while supervisor mode is not supported. If the hart supports mutable `misa[S]` so that supervisor mode can be dynamically enabled, then setting `SEI` to 1 here and _then_ enabling `misa[S]` will result in the interrupt becoming visible.
 
-Space for other registers is reserved for future use. In version 1.0, accessing them raises an access fault.
+`mtopei_cfg` / `stopei_cfg` (added in version 1.1): these configure the AIA "top external interrupt" view for the machine external interrupt (MEI) and supervisor external interrupt (SEI) respectively. Each is a 32-bit WARL register with the same layout as the AIA `mtopi`/`stopi` (and future `mtopei`/`stopei`) CSRs:
+
+| Offset (Bits) | Meaning                     |
+| ------------- | --------------------------- |
+| 0-7           | interrupt priority (IPRIO)  |
+| 8-15          | _reserved_ (read-only zero) |
+| 16-26         | interrupt identity (IID)    |
+| 27-31         | _reserved_ (read-only zero) |
+
+Reserved bits read as zero and ignore writes. These registers let test code drive a meaningful (identity, priority) so that the AIA top interrupt CSRs (and, in later versions of the model, the external interrupt controller `topei` interface) report useful values for the external interrupts.
+
+For an external interrupt controller, an IPRIO of 0 is reserved: unlike the major-interrupt priority arrays (where 0 means "use the default priority"), 0 is the external controller's "no interrupt" sentinel and is never a valid live priority. It is therefore illegal to configure an external interrupt with priority 0. Since these registers are WARL, a written IPRIO of 0 is legalized to 1, so the register reads back as 1.
+
+`stopei_cfg` only exists when the target hart supports supervisor mode. If supervisor mode is not supported, it reads as zero and writes are ignored.
+
+Space for other registers is reserved for future use. In this version, accessing them raises an access fault.
 
 ## Example C++ Code
 

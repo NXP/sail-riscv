@@ -125,9 +125,11 @@ add_first_party_test("test_wfi_wait.S")
 add_first_party_test("test_vrgatherei16_reg_group.S")
 add_first_party_test("test_tlb_stale_pte_access_fault.S")
 add_first_party_test("test_indirect_csr.S")
+add_first_party_test("test_mtopi.S")
 
 add_first_party_override_test("test_sew_elen_bound.S" "elen_32.json")
 add_first_party_override_test("test_satp_physaddr_bits.S" "satp_physaddr_bits.json")
+add_first_party_override_test("test_mtopi_external_iprio.S" "aia_external_iprio.json")
 
 list(LENGTH tests tests_len)
 math(EXPR test_last "${tests_len} - 1")
