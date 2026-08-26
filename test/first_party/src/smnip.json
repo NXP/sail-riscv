@@ -1,0 +1,22 @@
+{
+  "extensions": {
+    "Smnip": {
+      "supported": true
+    },
+    "Ssnip": {
+      "supported": true
+    },
+    "Smaia": {
+      "supported": true
+    },
+    "Ssaia": {
+      "supported": true
+    },
+    "Smcsrind": {
+      "supported": true
+    },
+    "Sscsrind": {
+      "supported": true
+    }
+  }
+}

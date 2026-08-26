@@ -585,6 +585,10 @@ function do_xret(priv : Privilege) -> ExecutionResult = {
   if   hartSupports(Ext_Zicfilp)
   then zicfilp_restore_elp_on_xret(if priv == Machine then mRET else sRET, cur_privilege);
 
+  // Smnip/Ssnip: restore xithreshold.iprio from the saved
+  // xistatus.pithreshprio for the privilege being returned from.
+  smnip_xret_restore(priv);
+
   long_csr_write_callback("mstatus", "mstatush", mstatus.bits);
 
   if   get_config_print_exception()

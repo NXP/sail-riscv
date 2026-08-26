@@ -604,6 +604,18 @@ mapping clause extensionName = Ext_Ssip <-> "ssip"
 function clause hartSupports(Ext_Ssip) = (config extensions.Ssip.supported : bool) & hartSupports(Ext_Smip) & hartSupports(Ext_S)
 function clause currentlyEnabled(Ext_Ssip) = hartSupports(Ext_Ssip) & currentlyEnabled(Ext_S)
 
+// Nested interrupt preemption (machine level). Does not depend on Smidctrl;
+// only requires a priority concept, which is provided by the AIA
+// arbitration reused for mtopsi.
+enum clause extension = Ext_Smnip
+mapping clause extensionName = Ext_Smnip <-> "smnip"
+function clause hartSupports(Ext_Smnip) = config extensions.Smnip.supported
+function clause currentlyEnabled(Ext_Smnip) = hartSupports(Ext_Smnip)
+// Nested interrupt preemption (supervisor level).
+enum clause extension = Ext_Ssnip
+mapping clause extensionName = Ext_Ssnip <-> "ssnip"
+function clause hartSupports(Ext_Ssnip) = (config extensions.Ssnip.supported : bool) & hartSupports(Ext_Smnip) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssnip) = hartSupports(Ext_Ssnip) & currentlyEnabled(Ext_S)
 
 // QoS identifiers
 enum clause extension = Ext_Ssqosid
@@ -672,6 +684,8 @@ function hartSupports_measure(ext : extension) -> int =
     Ext_Zvksg => 2, // > Zvks
     Ext_Smaia => 2, // > Smcsrind
     Ext_Ssaia => 3, // > Smaia, Sscsrind
+
+    Ext_Ssnip => 1, // > Smnip, S
 
     _ => 0,
   }
@@ -917,17 +931,17 @@ let extensions_ordered_for_isa_string = [
   Ext_Smaia,
   Ext_Smcntrpmf,
   Ext_Smcsps,
+  Ext_Smcsrind,
   Ext_Smehv,
   Ext_Smijt,
   Ext_Smip,
-  Ext_Smcsrind,
   Ext_Smmpm,
+  Ext_Smnip,
   Ext_Smnpm,
   Ext_Smstateen,
   Ext_Sscsps,
   Ext_Ssehv,
   Ext_Ssijt,
   Ext_Ssip,
+  Ext_Ssnip,
 ]
-
-

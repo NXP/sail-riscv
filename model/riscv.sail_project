@@ -96,7 +96,7 @@ extensions {
       files extensions/I/base_types.sail
     }
     I_insts {
-      requires exceptions, sys, I_types, Zicfilp_regs
+      requires exceptions, sys, I_types, Zicfilp_regs, aclic_regs
 
       files
         extensions/I/base_insts.sail,
@@ -418,6 +418,22 @@ extensions {
     requires core, sys, exceptions, aclic_regs, I
     files extensions/aclic/smip.sail
   }
+
+  // ACLIC: Nested interrupt preemption (Smnip/Ssnip)
+  //
+  // Adds a per-privilege interrupt-enable threshold (mithreshold/
+  // sithreshold), a signed top-interrupt CSR (mtopsi/stopsi), and nested-
+  // preemption masking of the pending set. The behavioral hooks
+  // (smnip_mask_pending, smnip_trap_enter, smnip_xret_restore) are forward
+  // declared in aclic_regs so getPendingSet/trap_handler/do_xret can call
+  // them; they reduce to no-ops when the extension is not enabled. Smnip
+  // does not depend on Smidctrl: it only needs a priority concept, borrowed
+  // from the AIA arbitration (read_xtopsi/topi_iprio in core).
+  Smnip {
+    requires core, sys, exceptions, aclic_regs, I
+    files extensions/aclic/smnip.sail
+  }
+
 
   Zawrs {
     requires core

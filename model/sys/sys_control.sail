@@ -120,10 +120,14 @@ function getPendingSet(priv : Privilege) -> option((xlenbits, Privilege)) = {
   // for platform use (see
   // `core/interrupt_regs.sail:legalize_mideleg()`), but those
   // interrupts are not known in `findPendingInterrupt()` above.
-  let pending_m = mip_bits & mie.bits & ~(mideleg_bits);
-  let pending_s = mip_bits & mie.bits & mideleg_bits;
+  // Smnip/Ssnip: when nested preemption is enabled for a privilege, mask
+  // out sources whose reported IPRIO is at or below the nested-preemption
+  // threshold (smnip_mask_pending is the identity when Smnip/Ssnip is off).
+  let pending_m = smnip_mask_pending(Machine,    mip_bits & mie.bits & ~(mideleg_bits));
+  let pending_s = smnip_mask_pending(Supervisor, mip_bits & mie.bits & mideleg_bits);
 
   let mIE = (priv == Machine    & mstatus[MIE] == 0b1) | priv == Supervisor | priv == User;
+
   let sIE = (priv == Supervisor & mstatus[SIE] == 0b1) | priv == User;
 
   if      mIE & (pending_m != zeros()) then Some((pending_m, Machine))
@@ -201,9 +205,13 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
                      -> xlenbits = {
   let is_interrupt = trapCause_is_interrupt(c);
   let cause        = trapCause_bits(c);
+  // Smnip/Ssnip: capture the privilege we are trapping from so the nested-
+  // preemption hook can detect a double trap into M-mode.
+  let prev_priv    = cur_privilege;
 
   if   get_config_print_exception() | get_config_print_interrupt()
   then print_log("handling " ^ to_str(c)
+
                       ^ " at priv " ^ to_str(del_priv)
                       ^ " with tval " ^ bits_str(tval(info)));
 
@@ -223,6 +231,10 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
       cur_privilege = del_priv;
 
       handle_trap_extension(del_priv, pc, ext);
+
+      // Smnip/Ssnip: save/raise the interrupt-enable threshold and rewrite
+      // mcause to the signed identity when nested preemption is enabled.
+      smnip_trap_enter(del_priv, prev_priv, is_interrupt);
 
       track_trap(del_priv, is_interrupt, cause);
 
@@ -254,6 +266,10 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
       cur_privilege   = del_priv;
 
       handle_trap_extension(del_priv, pc, ext);
+
+      // Smnip/Ssnip: save/raise the interrupt-enable threshold and rewrite
+      // scause to the signed identity when nested preemption is enabled.
+      smnip_trap_enter(del_priv, prev_priv, is_interrupt);
 
       track_trap(del_priv, is_interrupt, cause);
 
