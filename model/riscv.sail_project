@@ -73,6 +73,16 @@ sys {
     sys/simple_interrupt_generator.sail,
     sys/aia_interrupt_file.sail,
     sys/imsic.sail,
+    aplic/aplic_types.sail,
+    aplic/aplic_domain.sail,
+    aplic/aplic_regs.sail,
+    aplic/aplic_idc_direct.sail,
+    aplic/aplic_delivery_direct.sail,
+    aplic/aplic_mmio.sail,
+    // The combined mux clause must precede the standalone IMSIC and APLIC
+    // dispatch clauses so that, when both controllers are enabled, its
+    // more-specific guard wins.
+    sys/ext_intctl_combined.sail,
     sys/ext_intctl_dispatch.sail,
     sys/platform.sail,
     sys/mem_utils.sail,

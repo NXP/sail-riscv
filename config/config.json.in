@@ -449,12 +449,18 @@
       // is 255.
       "num_interrupt_identities": 255
     },
-    // APLIC (Advanced Platform-Level Interrupt Controller). The IMSIC's
-    // eidelivery deliverer-select logic references this enable flag; the
-    // memory-mapped APLIC device itself is introduced in a later commit.
+    // APLIC (Advanced Platform-Level Interrupt Controller). This changeset
+    // implements direct delivery only. When an IMSIC is also present, the
+    // IMSIC's eidelivery register selects whether the IMSIC or the APLIC
+    // delivers external interrupts to the hart.
     "aplic": {
       // Whether the platform contains an APLIC.
-      "supported": false
+      "supported": false,
+      // If supported, this must be in a suitable IO memory region (see
+      // `memory.regions`) and 4KiB aligned. If not supported, leave as 0.
+      "base": 0,
+      // Number of active interrupt domains (1 or 2).
+      "num_domains": 2
     },
     "clock_frequency": 1000000000,
 

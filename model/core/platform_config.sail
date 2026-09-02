@@ -123,10 +123,15 @@ let plat_imsic_size : physaddrbits = zero_extend(0x2000)
 // is reserved (never pending). Identities above this value are read-only zero.
 let plat_imsic_num_ids : int = config platform.imsic.num_interrupt_identities
 
-// APLIC (Advanced Platform-Level Interrupt Controller) enable flag. Referenced
-// by the IMSIC eidelivery deliverer-select logic; the memory-mapped APLIC
-// device itself is introduced in a later commit.
+// APLIC (Advanced Platform-Level Interrupt Controller). This changeset
+// implements direct interrupt delivery only. When an IMSIC is also present,
+// the IMSIC's per-privilege eidelivery register selects the deliverer (see
+// sys/ext_intctl_combined.sail).
 let plat_aplic_enabled : bool = config platform.aplic.supported
+let plat_aplic_base : physaddrbits = to_bits_checked(config platform.aplic.base : int)
+// Number of active interrupt domains. The tested configuration uses two
+// (a machine-level root and a supervisor-level child at the same hart).
+let plat_aplic_num_domains : range(1, 2) = config platform.aplic.num_domains
 
 let plat_insns_per_tick : nat1 = config platform.instructions_per_tick
 
