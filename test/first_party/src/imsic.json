@@ -1,0 +1,22 @@
+{
+  "platform": {
+    "simple_interrupt_generator": {
+      "supported": false,
+      "base": 0
+    },
+    "imsic": {
+      "supported": true,
+      "base": 34603008,
+
+      "num_interrupt_identities": 255
+    }
+  },
+  "extensions": {
+    "Smaia": {
+      "supported": true
+    },
+    "Ssaia": {
+      "supported": true
+    }
+  }
+}

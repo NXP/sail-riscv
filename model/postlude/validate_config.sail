@@ -423,7 +423,11 @@ private function check_mem_layout() -> bool =
                    within_configured_pma_memory("simple interrupt generator (platform.simple_interrupt_generator)", Some(IOMemory),
                                                 to_bits_checked(config platform.simple_interrupt_generator.base : int),
                                                 zero_extend(plat_sig_size));
-    pmas_ok & clint_ok & sig_ok
+    let imsic_ok = not(plat_have_imsic) |
+                   within_configured_pma_memory("IMSIC (platform.imsic)", Some(IOMemory),
+                                                zero_extend(plat_imsic_base),
+                                                zero_extend(plat_imsic_size));
+    pmas_ok & clint_ok & sig_ok & imsic_ok
   }
 
 private function check_pmp() -> bool = {
@@ -651,7 +655,35 @@ private function check_mmio_devices() -> bool = {
   valid
 }
 
+private function check_imsic_config() -> bool = {
+  if not(plat_have_imsic) then return true;
+  var valid : bool = true;
+  // The IMSIC and the Simple Interrupt Generator are mutually-exclusive
+  // external interrupt controllers; at most one may be configured.
+  if (config platform.simple_interrupt_generator.supported : bool) then {
+    valid = false;
+    print_endline("Both the IMSIC (platform.imsic) and the Simple Interrupt Generator (platform.simple_interrupt_generator) are enabled: they are mutually exclusive external interrupt controllers.");
+  };
+  // The IMSIC requires the AIA extensions to expose its CSRs.
+  if not(config extensions.Smaia.supported : bool) then {
+    valid = false;
+    print_endline("The IMSIC (platform.imsic) is enabled but Smaia is disabled: the IMSIC requires Smaia.");
+  };
+  // Each interrupt file is a 4KiB page, so the base must be page-aligned.
+  if plat_imsic_base[pagesize_bits - 1 .. 0] != zeros() then {
+    valid = false;
+    print_endline("platform.imsic.base is not aligned to a 4K (page) boundary.");
+  };
+  // The number of interrupt identities per file must be in 1 .. 2047.
+  if plat_imsic_num_ids < 1 | plat_imsic_num_ids > 2047 then {
+    valid = false;
+    print_endline("platform.imsic.num_interrupt_identities is " ^ dec_str(plat_imsic_num_ids) ^ " but must be within [1, 2047].");
+  };
+  valid
+}
+
 private function check_mstatus_fields() -> bool = {
+
   var valid : bool = true;
 
   let legal_fs : ExtContextPolicy = config base.mstatus.fs_legal_states;
@@ -726,7 +758,9 @@ function config_is_valid() -> bool = {
   & check_mmu_config()
   & check_mem_layout()
   & check_mmio_devices()
+  & check_imsic_config()
   & check_vlen_elen()
+
   & check_vext_config()
   & check_pmp()
   & check_misc_extension_dependencies()
