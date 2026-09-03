@@ -342,14 +342,15 @@ overload to_str = {trapCause_to_str}
 // trap modes
 
 type tv_mode = bits(2)
-enum TrapVectorMode = {TV_Direct, TV_Vector, TV_Reserved}
+enum TrapVectorMode = {TV_Direct, TV_Vector, TV_Reserved, TV_JumpTable}
 
 mapping trapVectorMode : tv_mode <-> TrapVectorMode = {
   0b00 <-> TV_Direct,
   0b01 <-> TV_Vector,
   0b10 <-> TV_Reserved,
-  0b11 <-> TV_Reserved,
+  0b11 <-> TV_JumpTable,
 }
+
 
 // xRET types
 // (capitalized versions conflict with the instructions themselves)

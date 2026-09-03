@@ -21,6 +21,14 @@ let plat_mtvec_direct_base_alignment_exp   : tvec_alignment = config base.mtvec.
 let plat_mtvec_vectored_base_alignment_exp : tvec_alignment = config base.mtvec.vectored.base_alignment
 let plat_stvec_vectored_base_alignment_exp : tvec_alignment = config base.stvec.vectored.base_alignment
 
+// Interrupt jump-table base alignment (Smijt/Ssijt). The ACLIC layout
+// fixes mijt/sijt.BASE at bits [XLEN-1:6], so the minimum alignment is
+// 2^6 (64 bytes); the exact alignment above that is implementation-defined.
+type ijt_alignment = range(6, 24)
+let plat_mijt_base_alignment_exp : ijt_alignment = config base.mijt.base_alignment
+let plat_sijt_base_alignment_exp : ijt_alignment = config base.sijt.base_alignment
+
+
 // Delegatable bits of `medeleg` and `mideleg`.
 let plat_medeleg_delegatable_bits : bits(64) = config base.medeleg.delegatable_bits
 let plat_mideleg_delegatable_bits : xlenbits = config base.mideleg.delegatable_bits
@@ -123,10 +131,27 @@ let plat_imsic_size : physaddrbits = zero_extend(0x2000)
 // is reserved (never pending). Identities above this value are read-only zero.
 let plat_imsic_num_ids : int = config platform.imsic.num_interrupt_identities
 
-// APLIC (Advanced Platform-Level Interrupt Controller) enable flag. Referenced
-// by the IMSIC eidelivery deliverer-select logic; the memory-mapped APLIC
-// device itself is introduced in a later commit.
+// APLIC (Advanced Platform-Level Interrupt Controller). This changeset
+// implements direct interrupt delivery only. When an IMSIC is also present,
+// the IMSIC's per-privilege eidelivery register selects the deliverer (see
+// sys/ext_intctl_combined.sail).
 let plat_aplic_enabled : bool = config platform.aplic.supported
+let plat_aplic_base : physaddrbits = to_bits_checked(config platform.aplic.base : int)
+// Number of active interrupt domains. The tested configuration uses two
+// (a machine-level root and a supervisor-level child at the same hart).
+let plat_aplic_num_domains : range(1, 2) = config platform.aplic.num_domains
+
+// ACLIC (Advanced Core-Local Interrupt Controller) hart-local interrupt
+// domain control (Smidctrl/Ssidctrl). The ACLIC reuses the per-domain APLIC
+// source state (pending/enable/target/sourcecfg) but operates it entirely
+// through hart-local indirect CSRs rather than the memory-mapped APLIC. It is
+// mutually exclusive with the IMSIC (both drive xEIP). The per-domain APLIC
+// state files are always compiled in, so enabling the ACLIC does not require
+// plat_aplic_enabled (the memory-mapped APLIC window). Domain 0 is the
+// machine-level domain and domain 1 the supervisor-level domain, mirroring
+// aplic_domain_privilege.
+let plat_have_aclic : bool = config platform.aclic.supported
+
 
 let plat_insns_per_tick : nat1 = config platform.instructions_per_tick
 

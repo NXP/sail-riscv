@@ -197,6 +197,20 @@ function write_mip(value : xlenbits) -> unit = {
   mip = legalize_mip(mip, value);
 }
 
+// Clear the pending bit of interrupt source `i`. Used by the ACLIC
+// hardware-vectoring trap entry, which "clears the corresponding
+// interrupt-pending bit if possible". The bit position in Minterrupts equals
+// the source's major identity (exc_code), so we clear mip.bits at that index.
+// The clear is best-effort: a still-asserted level source (timer, or the
+// external MEI/SEI which are OR'd in on read) simply re-pends.
+function clear_interrupt_pending(i : InterruptType) -> unit = {
+  let idx = unsigned(interruptType_bits(i));
+  let mask : xlenbits = to_bits_truncate(xlen, 1) << idx;
+  mip = Mk_Minterrupts(mip.bits & ~(mask));
+}
+
+
+
 function clause read_CSR(0x304) = mie.bits
 function clause read_CSR(0x344) = read_mip(ExcludePlatformInterrupts).bits
 function clause read_CSR(0x302) = medeleg.bits[xlen - 1 .. 0]

@@ -16,7 +16,7 @@ function is_sstateen_accessible() -> bool = currentlyEnabled(Ext_S) & (currently
 termination_measure is_hstateen_accessible() = 5 // > Ext_H
 termination_measure is_sstateen_accessible() = 2 // > Ext_S
 
-enum stateen_bit = {STATEEN_FCSR, STATEEN_SRMCFG, STATEEN_ENVCFG, STATEEN_SE, STATEEN_CSRIND, STATEEN_AIA, STATEEN_IMSIC}
+enum stateen_bit = {STATEEN_FCSR, STATEEN_SRMCFG, STATEEN_ACLIC, STATEEN_ENVCFG, STATEEN_SE, STATEEN_CSRIND, STATEEN_AIA, STATEEN_IMSIC}
 
 mapping stateen_bit_index : stateen_bit <-> range(0, 63) = {
   STATEEN_SE     <-> 63,
@@ -25,6 +25,7 @@ mapping stateen_bit_index : stateen_bit <-> range(0, 63) = {
   STATEEN_AIA    <-> 59,
   STATEEN_IMSIC  <-> 58,
   STATEEN_SRMCFG <-> 55,
+  STATEEN_ACLIC  <-> 53,
   STATEEN_FCSR   <-> 1,
 }
 
@@ -39,6 +40,7 @@ bitfield Mstateen0 : bits(64) = {
   P1P13   : 56,
   SRMCFG  : 55,
   CTR     : 54,
+  ACLIC   : 53,
 
   JVT     : 2,
   FCSR    : 1,
@@ -70,6 +72,7 @@ function legalize_mstateen0(m : Mstateen0, v : bits(64)) -> Mstateen0 = {
     SE0    = if config extensions.Stateen.SE0_readonly_zero then 0b0 else v[SE0],
     ENVCFG = if currentlyEnabled(Ext_S) then v[ENVCFG] else 0b0,
     SRMCFG = if currentlyEnabled(Ext_Ssqosid) then v[SRMCFG] else 0b0,
+    ACLIC  = if hartSupports(Ext_Sscsps) then v[ACLIC] else 0b0,
     FCSR   = if hartSupports(Ext_Zfinx) & (misa[F] == 0b0) then v[FCSR] else 0b0,
     C      = if config extensions.Stateen.C_readonly_zero then 0b0 else v[C],
   ];

@@ -349,18 +349,22 @@ function htif_store(addr, width, data) = {
 function within_mmio_readable forall 'n, 0 < 'n <= max_mem_access . (addr : physaddr, width : int('n)) -> bool =
   if get_config_rvfi()
   then false
-  else within_clint(addr, width) | within_sig(addr, width) | (within_htif_readable(addr, width) & 1 <= 'n)
+  else within_clint(addr, width) | within_sig(addr, width) | within_imsic(addr, width) | within_aplic(addr, width) | (within_htif_readable(addr, width) & 1 <= 'n)
 
 function within_mmio_writable forall 'n, 0 < 'n <= max_mem_access . (addr : physaddr, width : int('n)) -> bool =
   if get_config_rvfi()
   then false
-  else within_clint(addr, width) | within_sig(addr, width) | (within_htif_writable(addr, width) & 'n <= 8)
+  else within_clint(addr, width) | within_sig(addr, width) | within_imsic(addr, width) | within_aplic(addr, width) | (within_htif_writable(addr, width) & 'n <= 8)
 
 function mmio_read forall 'n, 0 < 'n <= max_mem_access . (access : MemoryAccessType(mem_payload), paddr : physaddr, width : int('n)) -> MemoryOpResult(bits(8 * 'n)) =
   if   within_clint(paddr, width)
   then clint_load(access, paddr, width)
   else if within_sig(paddr, width)
   then sig_load(access, paddr, width)
+  else if within_imsic(paddr, width)
+  then imsic_load(access, paddr, width)
+  else if within_aplic(paddr, width)
+  then aplic_load(access, paddr, width)
   else if within_htif_readable(paddr, width)
   then htif_load(access, paddr, width)
   else Err(paddr, accessFaultFromAccessType(access))
@@ -370,6 +374,11 @@ function mmio_write forall 'n, 0 < 'n <= max_mem_access . (paddr : physaddr, wid
   then clint_store(paddr, width, data)
   else if within_sig(paddr, width)
   then sig_store(paddr, width, data)
+  else if within_imsic(paddr, width)
+  then imsic_store(paddr, width, data)
+  else if within_aplic(paddr, width)
+  then aplic_store(paddr, width, data)
   else if within_htif_writable(paddr, width)
   then htif_store(paddr, width, data)
   else Err(paddr, E_SAMO_Access_Fault())
+

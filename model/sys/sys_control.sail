@@ -120,10 +120,14 @@ function getPendingSet(priv : Privilege) -> option((xlenbits, Privilege)) = {
   // for platform use (see
   // `core/interrupt_regs.sail:legalize_mideleg()`), but those
   // interrupts are not known in `findPendingInterrupt()` above.
-  let pending_m = mip_bits & mie.bits & ~(mideleg_bits);
-  let pending_s = mip_bits & mie.bits & mideleg_bits;
+  // Smnip/Ssnip: when nested preemption is enabled for a privilege, mask
+  // out sources whose reported IPRIO is at or below the nested-preemption
+  // threshold (smnip_mask_pending is the identity when Smnip/Ssnip is off).
+  let pending_m = smnip_mask_pending(Machine,    mip_bits & mie.bits & ~(mideleg_bits));
+  let pending_s = smnip_mask_pending(Supervisor, mip_bits & mie.bits & mideleg_bits);
 
   let mIE = (priv == Machine    & mstatus[MIE] == 0b1) | priv == Supervisor | priv == User;
+
   let sIE = (priv == Supervisor & mstatus[SIE] == 0b1) | priv == User;
 
   if      mIE & (pending_m != zeros()) then Some((pending_m, Machine))
@@ -201,9 +205,13 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
                      -> xlenbits = {
   let is_interrupt = trapCause_is_interrupt(c);
   let cause        = trapCause_bits(c);
+  // Smnip/Ssnip: capture the privilege we are trapping from so the nested-
+  // preemption hook can detect a double trap into M-mode.
+  let prev_priv    = cur_privilege;
 
   if   get_config_print_exception() | get_config_print_interrupt()
   then print_log("handling " ^ to_str(c)
+
                       ^ " at priv " ^ to_str(del_priv)
                       ^ " with tval " ^ bits_str(tval(info)));
 
@@ -224,9 +232,18 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
 
       handle_trap_extension(del_priv, pc, ext);
 
+      // Smnip/Ssnip: save/raise the interrupt-enable threshold and rewrite
+      // mcause to the signed identity when nested preemption is enabled.
+      smnip_trap_enter(del_priv, prev_priv, is_interrupt);
+
       track_trap(del_priv, is_interrupt, cause);
 
-      prepare_trap_vector(del_priv, mcause)
+      // Smehv/Ssehv: a synchronous exception may be hardware-vectored via
+      // xijt.EHV; fall back to the normal trap vector otherwise.
+      match smehv_exc_vector(del_priv, mcause) {
+        Some(v) => v,
+        None()  => prepare_trap_vector(del_priv, mcause),
+      }
     },
     Supervisor => {
       assert (currentlyEnabled(Ext_S), "no supervisor mode present for delegation");
@@ -250,9 +267,18 @@ function trap_handler(del_priv : Privilege, c : TrapCause, pc : xlenbits, info :
 
       handle_trap_extension(del_priv, pc, ext);
 
+      // Smnip/Ssnip: save/raise the interrupt-enable threshold and rewrite
+      // scause to the signed identity when nested preemption is enabled.
+      smnip_trap_enter(del_priv, prev_priv, is_interrupt);
+
       track_trap(del_priv, is_interrupt, cause);
 
-      prepare_trap_vector(del_priv, scause)
+      // Smehv/Ssehv: a synchronous exception may be hardware-vectored via
+      // xijt.EHV; fall back to the normal trap vector otherwise.
+      match smehv_exc_vector(del_priv, scause) {
+        Some(v) => v,
+        None()  => prepare_trap_vector(del_priv, scause),
+      }
     },
     User              => internal_error(__FILE__, __LINE__, "Invalid privilege level"),
     VirtualUser       => internal_error(__FILE__, __LINE__, "Hypervisor extension not supported"),
@@ -308,8 +334,18 @@ function make_sync_exception(e : ExceptionType, xtval : xlenbits) -> sync_except
 function handle_exception(xtval : xlenbits, e : ExceptionType) -> unit =
   set_next_pc(exception_handler(cur_privilege, make_sync_exception(e, xtval), PC))
 
+// Interrupt trap entry. Without any ACLIC trap-entry extension enabled for
+// del_priv this just enters the trap and takes the vector. When an ACLIC
+// trap-entry extension is active (jump-table vectoring or the Smip/Ssip
+// interrupt-handler push) the ACLIC path is taken instead: it performs the
+// jump-table lookup, the handler push, and the pending-bit clear, taking any
+// faulting push/lookup as a precise synchronous exception with the
+// interrupted context left intact. Defined in
+// extensions/aclic/aclic_sys_control.sail.
 function handle_interrupt(i : InterruptType, del_priv : Privilege) -> unit =
-  set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None()))
+  if not(aclic_trap_entry_active(del_priv))
+  then set_next_pc(trap_handler(del_priv, Interrupt(i), PC, None(), None()))
+  else handle_interrupt_aclic(i, del_priv)
 
 // Reset misa to enable the maximal set of supported extensions.
 function reset_misa() -> unit = {

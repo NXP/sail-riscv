@@ -559,6 +559,64 @@ enum clause extension = Ext_Smstateen
 mapping clause extensionName = Ext_Smstateen <-> "smstateen"
 function clause hartSupports(Ext_Smstateen) = config extensions.Stateen.Smstateen.supported
 
+// Conditional Stack Pointer Swap (machine level)
+enum clause extension = Ext_Smcsps
+mapping clause extensionName = Ext_Smcsps <-> "smcsps"
+function clause hartSupports(Ext_Smcsps) = config extensions.Smcsps.supported
+function clause currentlyEnabled(Ext_Smcsps) = hartSupports(Ext_Smcsps)
+// Conditional Stack Pointer Swap (supervisor level)
+enum clause extension = Ext_Sscsps
+mapping clause extensionName = Ext_Sscsps <-> "sscsps"
+function clause hartSupports(Ext_Sscsps) = (config extensions.Sscsps.supported : bool) & hartSupports(Ext_Smcsps) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Sscsps) = hartSupports(Ext_Sscsps) & currentlyEnabled(Ext_S)
+
+
+// Interrupt jump table / hardware vectoring (machine level)
+enum clause extension = Ext_Smijt
+mapping clause extensionName = Ext_Smijt <-> "smijt"
+function clause hartSupports(Ext_Smijt) = config extensions.Smijt.supported
+function clause currentlyEnabled(Ext_Smijt) = hartSupports(Ext_Smijt)
+// Interrupt jump table / hardware vectoring (supervisor level)
+enum clause extension = Ext_Ssijt
+mapping clause extensionName = Ext_Ssijt <-> "ssijt"
+function clause hartSupports(Ext_Ssijt) = (config extensions.Ssijt.supported : bool) & hartSupports(Ext_Smijt) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssijt) = hartSupports(Ext_Ssijt) & currentlyEnabled(Ext_S)
+
+// Synchronous exception hardware vectoring (machine level)
+enum clause extension = Ext_Smehv
+mapping clause extensionName = Ext_Smehv <-> "smehv"
+function clause hartSupports(Ext_Smehv) = (config extensions.Smehv.supported : bool) & hartSupports(Ext_Smijt)
+function clause currentlyEnabled(Ext_Smehv) = hartSupports(Ext_Smehv) & currentlyEnabled(Ext_Smijt)
+// Synchronous exception hardware vectoring (supervisor level)
+enum clause extension = Ext_Ssehv
+mapping clause extensionName = Ext_Ssehv <-> "ssehv"
+function clause hartSupports(Ext_Ssehv) = (config extensions.Ssehv.supported : bool) & hartSupports(Ext_Smehv) & hartSupports(Ext_Ssijt) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssehv) = hartSupports(Ext_Ssehv) & currentlyEnabled(Ext_Ssijt) & currentlyEnabled(Ext_S)
+
+// Interrupt handler push and pop (machine level)
+enum clause extension = Ext_Smip
+mapping clause extensionName = Ext_Smip <-> "smip"
+function clause hartSupports(Ext_Smip) = config extensions.Smip.supported
+function clause currentlyEnabled(Ext_Smip) = hartSupports(Ext_Smip)
+// Interrupt handler push and pop (supervisor level)
+enum clause extension = Ext_Ssip
+mapping clause extensionName = Ext_Ssip <-> "ssip"
+function clause hartSupports(Ext_Ssip) = (config extensions.Ssip.supported : bool) & hartSupports(Ext_Smip) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssip) = hartSupports(Ext_Ssip) & currentlyEnabled(Ext_S)
+
+// Nested interrupt preemption (machine level). Does not depend on Smidctrl;
+// only requires a priority concept, which is provided by the AIA
+// arbitration reused for mtopsi.
+enum clause extension = Ext_Smnip
+mapping clause extensionName = Ext_Smnip <-> "smnip"
+function clause hartSupports(Ext_Smnip) = config extensions.Smnip.supported
+function clause currentlyEnabled(Ext_Smnip) = hartSupports(Ext_Smnip)
+// Nested interrupt preemption (supervisor level).
+enum clause extension = Ext_Ssnip
+mapping clause extensionName = Ext_Ssnip <-> "ssnip"
+function clause hartSupports(Ext_Ssnip) = (config extensions.Ssnip.supported : bool) & hartSupports(Ext_Smnip) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssnip) = hartSupports(Ext_Ssnip) & currentlyEnabled(Ext_S)
+
 // QoS identifiers
 enum clause extension = Ext_Ssqosid
 mapping clause extensionName = Ext_Ssqosid <-> "ssqosid"
@@ -587,6 +645,21 @@ enum clause extension = Ext_Ssaia
 mapping clause extensionName = Ext_Ssaia <-> "ssaia"
 function clause hartSupports(Ext_Ssaia) = (config extensions.Ssaia.supported : bool) & hartSupports(Ext_Smaia) & hartSupports(Ext_Sscsrind)
 function clause currentlyEnabled(Ext_Ssaia) = hartSupports(Ext_Ssaia) & currentlyEnabled(Ext_Sscsrind)
+
+// ACLIC hart-local interrupt domain control, machine level (Smidctrl).
+// Reuses the indirect-CSR (Smaia/Smcsrind) access path to operate the
+// per-domain APLIC source state hart-locally.
+enum clause extension = Ext_Smidctrl
+mapping clause extensionName = Ext_Smidctrl <-> "smidctrl"
+function clause hartSupports(Ext_Smidctrl) = (config extensions.Smidctrl.supported : bool) & hartSupports(Ext_Smaia)
+function clause currentlyEnabled(Ext_Smidctrl) = hartSupports(Ext_Smidctrl) & currentlyEnabled(Ext_Smaia)
+
+// ACLIC hart-local interrupt domain control, supervisor level (Ssidctrl).
+enum clause extension = Ext_Ssidctrl
+mapping clause extensionName = Ext_Ssidctrl <-> "ssidctrl"
+function clause hartSupports(Ext_Ssidctrl) = (config extensions.Ssidctrl.supported : bool) & hartSupports(Ext_Smidctrl) & hartSupports(Ext_Ssaia) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssidctrl) = hartSupports(Ext_Ssidctrl) & currentlyEnabled(Ext_Ssaia) & currentlyEnabled(Ext_S)
+
 
 // Environment extensions
 
@@ -626,6 +699,10 @@ function hartSupports_measure(ext : extension) -> int =
     Ext_Zvksg => 2, // > Zvks
     Ext_Smaia => 2, // > Smcsrind
     Ext_Ssaia => 3, // > Smaia, Sscsrind
+    Ext_Smidctrl => 3, // > Smaia
+    Ext_Ssidctrl => 4, // > Smidctrl, Ssaia
+
+    Ext_Ssnip => 1, // > Smnip, S
 
     _ => 0,
   }
@@ -686,6 +763,9 @@ function currentlyEnabled_measure(ext : extension) -> int =
     Ext_Zvfbfmin => 3, // > Zve32f
     Ext_Zvkb => 3, // > Zvbb
     Ext_Zvknhb => 3, // > Zve64x
+    Ext_Smehv => 3, // > Smijt
+    Ext_Ssehv => 3, // > Ssijt
+
 
     Ext_H => 4, // > virtual_mem_supported
     Ext_Zve64d => 4, // > Zve64f
@@ -867,8 +947,18 @@ let extensions_ordered_for_isa_string = [
   // Machine mode extensions, ordered alphabetically.
   Ext_Smaia,
   Ext_Smcntrpmf,
+  Ext_Smcsps,
   Ext_Smcsrind,
+  Ext_Smehv,
+  Ext_Smijt,
+  Ext_Smip,
   Ext_Smmpm,
+  Ext_Smnip,
   Ext_Smnpm,
   Ext_Smstateen,
+  Ext_Sscsps,
+  Ext_Ssehv,
+  Ext_Ssijt,
+  Ext_Ssip,
+  Ext_Ssnip,
 ]

@@ -1,0 +1,13 @@
+{
+  "platform": {
+    "simple_interrupt_generator": {
+      "supported": false,
+      "base": 0
+    },
+    "aplic": {
+      "supported": true,
+      "base": 218103808,
+      "num_domains": 2
+    }
+  }
+}

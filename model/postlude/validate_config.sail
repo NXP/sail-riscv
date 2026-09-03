@@ -652,6 +652,17 @@ private function check_mmio_devices() -> bool = {
     valid = false;
     print_endline("platform.simple_interrupt_generator.base is not 4-byte aligned.");
   };
+  // The APLIC and the simple interrupt generator both provide the shared
+  // external interrupt controller interface, so they cannot both be enabled.
+  if plat_aplic_enabled & plat_have_sig then {
+    valid = false;
+    print_endline("platform.aplic.supported and platform.simple_interrupt_generator.supported cannot both be true.");
+  };
+  // Each APLIC domain control region must be 4-KiB aligned.
+  if plat_aplic_enabled & plat_aplic_base[11 .. 0] != zeros() then {
+    valid = false;
+    print_endline("platform.aplic.base is not 4-KiB aligned.");
+  };
   valid
 }
 
@@ -678,6 +689,58 @@ private function check_imsic_config() -> bool = {
   if plat_imsic_num_ids < 1 | plat_imsic_num_ids > 2047 then {
     valid = false;
     print_endline("platform.imsic.num_interrupt_identities is " ^ dec_str(plat_imsic_num_ids) ^ " but must be within [1, 2047].");
+  };
+  valid
+}
+
+private function check_aclic_config() -> bool = {
+  if not(plat_have_aclic) then return true;
+  var valid : bool = true;
+  // The ACLIC and the IMSIC are mutually-exclusive external interrupt
+  // controllers: both drive xEIP through ext_intctl_topei, so at most one
+  // may be configured.
+  if plat_have_imsic then {
+    valid = false;
+    print_endline("Both the ACLIC (platform.aclic) and the IMSIC (platform.imsic) are enabled: they are mutually exclusive external interrupt controllers.");
+  };
+  // Likewise, the ACLIC operates the APLIC source state hart-locally through
+  // indirect CSRs and is mutually exclusive with the memory-mapped APLIC
+  // delivery path and with the Simple Interrupt Generator.
+  if plat_aplic_enabled then {
+    valid = false;
+    print_endline("Both the ACLIC (platform.aclic) and the memory-mapped APLIC (platform.aplic) are enabled: they are mutually exclusive external interrupt controllers.");
+  };
+  if (config platform.simple_interrupt_generator.supported : bool) then {
+    valid = false;
+    print_endline("Both the ACLIC (platform.aclic) and the Simple Interrupt Generator (platform.simple_interrupt_generator) are enabled: they are mutually exclusive external interrupt controllers.");
+  };
+  // Smidctrl operates the machine-level ACLIC domain through the machine
+  // indirect CSR framework, so it requires Smaia and Smcsrind.
+  if (config extensions.Smidctrl.supported : bool) then {
+    if not(config extensions.Smaia.supported : bool) then {
+      valid = false;
+      print_endline("The Smidctrl extension is enabled but Smaia is disabled: Smidctrl requires Smaia.");
+    };
+    if not(config extensions.Smcsrind.supported : bool) then {
+      valid = false;
+      print_endline("The Smidctrl extension is enabled but Smcsrind is disabled: Smidctrl requires Smcsrind.");
+    };
+  };
+  // Ssidctrl operates the supervisor-level ACLIC domain, so it requires
+  // supervisor mode, Ssaia and Sscsrind.
+  if (config extensions.Ssidctrl.supported : bool) then {
+    if not(config extensions.S.supported : bool) then {
+      valid = false;
+      print_endline("The Ssidctrl extension is enabled but supervisor mode (S) is disabled: Ssidctrl requires S.");
+    };
+    if not(config extensions.Ssaia.supported : bool) then {
+      valid = false;
+      print_endline("The Ssidctrl extension is enabled but Ssaia is disabled: Ssidctrl requires Ssaia.");
+    };
+    if not(config extensions.Sscsrind.supported : bool) then {
+      valid = false;
+      print_endline("The Ssidctrl extension is enabled but Sscsrind is disabled: Ssidctrl requires Sscsrind.");
+    };
   };
   valid
 }
@@ -759,6 +822,7 @@ function config_is_valid() -> bool = {
   & check_mem_layout()
   & check_mmio_devices()
   & check_imsic_config()
+  & check_aclic_config()
   & check_vlen_elen()
 
   & check_vext_config()
