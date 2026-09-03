@@ -652,6 +652,17 @@ private function check_mmio_devices() -> bool = {
     valid = false;
     print_endline("platform.simple_interrupt_generator.base is not 4-byte aligned.");
   };
+  // The APLIC and the simple interrupt generator both provide the shared
+  // external interrupt controller interface, so they cannot both be enabled.
+  if plat_aplic_enabled & plat_have_sig then {
+    valid = false;
+    print_endline("platform.aplic.supported and platform.simple_interrupt_generator.supported cannot both be true.");
+  };
+  // Each APLIC domain control region must be 4-KiB aligned.
+  if plat_aplic_enabled & plat_aplic_base[11 .. 0] != zeros() then {
+    valid = false;
+    print_endline("platform.aplic.base is not 4-KiB aligned.");
+  };
   valid
 }
 
