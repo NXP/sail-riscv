@@ -1,0 +1,35 @@
+{
+  "platform": {
+    "simple_interrupt_generator": {
+      "supported": false,
+      "base": 0
+    },
+    "imsic": {
+      "supported": false,
+      "base": 34603008,
+      "num_interrupt_identities": 255
+    },
+    "aplic": {
+      "supported": false,
+      "base": 218103808,
+      "num_domains": 2
+    },
+    "aclic": {
+      "supported": true
+    }
+  },
+  "extensions": {
+    "Smaia": {
+      "supported": true
+    },
+    "Ssaia": {
+      "supported": true
+    },
+    "Smidctrl": {
+      "supported": true
+    },
+    "Ssidctrl": {
+      "supported": true
+    }
+  }
+}

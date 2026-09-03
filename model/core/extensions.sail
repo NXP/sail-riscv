@@ -646,6 +646,21 @@ mapping clause extensionName = Ext_Ssaia <-> "ssaia"
 function clause hartSupports(Ext_Ssaia) = (config extensions.Ssaia.supported : bool) & hartSupports(Ext_Smaia) & hartSupports(Ext_Sscsrind)
 function clause currentlyEnabled(Ext_Ssaia) = hartSupports(Ext_Ssaia) & currentlyEnabled(Ext_Sscsrind)
 
+// ACLIC hart-local interrupt domain control, machine level (Smidctrl).
+// Reuses the indirect-CSR (Smaia/Smcsrind) access path to operate the
+// per-domain APLIC source state hart-locally.
+enum clause extension = Ext_Smidctrl
+mapping clause extensionName = Ext_Smidctrl <-> "smidctrl"
+function clause hartSupports(Ext_Smidctrl) = (config extensions.Smidctrl.supported : bool) & hartSupports(Ext_Smaia)
+function clause currentlyEnabled(Ext_Smidctrl) = hartSupports(Ext_Smidctrl) & currentlyEnabled(Ext_Smaia)
+
+// ACLIC hart-local interrupt domain control, supervisor level (Ssidctrl).
+enum clause extension = Ext_Ssidctrl
+mapping clause extensionName = Ext_Ssidctrl <-> "ssidctrl"
+function clause hartSupports(Ext_Ssidctrl) = (config extensions.Ssidctrl.supported : bool) & hartSupports(Ext_Smidctrl) & hartSupports(Ext_Ssaia) & hartSupports(Ext_S)
+function clause currentlyEnabled(Ext_Ssidctrl) = hartSupports(Ext_Ssidctrl) & currentlyEnabled(Ext_Ssaia) & currentlyEnabled(Ext_S)
+
+
 // Environment extensions
 
 // These extensions are not configurable via the config file
@@ -684,6 +699,8 @@ function hartSupports_measure(ext : extension) -> int =
     Ext_Zvksg => 2, // > Zvks
     Ext_Smaia => 2, // > Smcsrind
     Ext_Ssaia => 3, // > Smaia, Sscsrind
+    Ext_Smidctrl => 3, // > Smaia
+    Ext_Ssidctrl => 4, // > Smidctrl, Ssaia
 
     Ext_Ssnip => 1, // > Smnip, S
 

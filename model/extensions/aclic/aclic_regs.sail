@@ -408,10 +408,12 @@ function clause write_CSR(0x146, value) = { set_sistatus(value); Ok(get_sistatus
 // miconfig / siconfig - interrupt configuration CSRs (Smip/Ssip + Smnip/Ssnip).
 //
 // The ACLIC specification accesses miconfig/siconfig indirectly at
-// *iselect == 0x1000 through the mireg/sireg alias (indirect alias index 1).
-// The machine view (miconfig) exposes the full register; the supervisor view
-// (siconfig) is a subset exposing only the S-visible fields (sipu, snipen,
-// snipbits).
+// *iselect == 0x1000 through the mireg4/sireg4 alias (indirect alias index 4);
+// the mireg/mireg2/mireg3/mireg5/mireg6 aliases are reserved at that select
+// (the acliciprio/aclicsourcecfg registers introduced by Smidctrl/Ssidctrl
+// occupy aliases 1/2/3 of the 0x1000-0x10FF range). The machine view
+// (miconfig) exposes the full register; the supervisor view (siconfig) is a
+// subset exposing only the S-visible fields (sipu, snipen, snipbits).
 //
 // Backed fields:
 //   4  mipu  (Smip):  enable interrupt-handler push at machine level
@@ -466,33 +468,36 @@ function xiconfig_ipu(priv : Privilege) -> bits(1) =
 
 
 // Register the miconfig/siconfig views with the indirect CSR framework.
-// miconfig/siconfig are accessed through the mireg/sireg alias (indirect
-// alias index 1) at *iselect == 0x1000. The M-view is gated by Smip or
-// Smnip, the S-view (siconfig) by Ssip or Ssnip. Selects other than 0x1000
-// fall through to the default (unimplemented) clauses.
-function clause indirect_csr_implemented((Machine, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+// Per the ACLIC specification, miconfig/siconfig are accessed through the
+// mireg4/sireg4 alias (indirect alias index 4) at *iselect == 0x1000; the
+// mireg/mireg2/mireg3/mireg5/mireg6 aliases are reserved at that select
+// (the acliciprio/aclicsourcecfg registers introduced by Smidctrl/Ssidctrl
+// occupy aliases 1/2/3 of the 0x1000-0x10FF range). The M-view is gated by
+// Smip or Smnip, the S-view (siconfig) by Ssip or Ssnip. Selects other than
+// 0x1000 fall through to the default (unimplemented) clauses.
+function clause indirect_csr_implemented((Machine, select, 4) if select == ACLIC_ICONFIG_SELECT) =
   currentlyEnabled(Ext_Smip) | currentlyEnabled(Ext_Smnip)
-function clause indirect_csr_implemented((Supervisor, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+function clause indirect_csr_implemented((Supervisor, select, 4) if select == ACLIC_ICONFIG_SELECT) =
   currentlyEnabled(Ext_Ssip) | currentlyEnabled(Ext_Ssnip)
 
-function clause indirect_read((Machine, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+function clause indirect_read((Machine, select, 4) if select == ACLIC_ICONFIG_SELECT) =
   miconfig.bits[xlen - 1 .. 0]
 // siconfig is a subset view of miconfig: only the S-visible fields (sipu,
 // snipen, snipbits) are exposed.
-function clause indirect_read((Supervisor, select, 1) if select == ACLIC_ICONFIG_SELECT) =
+function clause indirect_read((Supervisor, select, 4) if select == ACLIC_ICONFIG_SELECT) =
   [Mk_Miconfig(zeros()) with
     sipu = miconfig[sipu],
     snipen = miconfig[snipen],
     snipbits = miconfig[snipbits]].bits[xlen - 1 .. 0]
 
-function clause indirect_write((Machine, select, 1, value) if select == ACLIC_ICONFIG_SELECT) = {
+function clause indirect_write((Machine, select, 4, value) if select == ACLIC_ICONFIG_SELECT) = {
   miconfig = legalize_miconfig(Mk_Miconfig(zero_extend(value)))
 }
 // Writing siconfig updates only the S-visible fields of miconfig; the
 // M-only fields are preserved.
-function clause indirect_write((Supervisor, select, 1, value) if select == ACLIC_ICONFIG_SELECT) = {
+function clause indirect_write((Supervisor, select, 4, value) if select == ACLIC_ICONFIG_SELECT) = {
   let w = Mk_Miconfig(zero_extend(value));
-  let merged = [miconfig with sipu = w[sipu]];
+  let merged = [miconfig with sipu = w[sipu], snipen = w[snipen], snipbits = w[snipbits]];
   miconfig = legalize_miconfig(merged)
 }
 

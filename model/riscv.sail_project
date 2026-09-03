@@ -79,6 +79,12 @@ sys {
     aplic/aplic_idc_direct.sail,
     aplic/aplic_delivery_direct.sail,
     aplic/aplic_mmio.sail,
+    // ACLIC hart-local interrupt domain control (Smidctrl/Ssidctrl): reuses
+    // the per-domain APLIC source state via hart-local indirect CSRs. Loaded
+    // after the APLIC state/accessor files it aliases, and (like the IMSIC
+    // and APLIC) before the ext_intctl dispatch files so its guarded
+    // ext_intctl_topei clauses are registered ahead of the fallback.
+    aplic/aclic.sail,
     // The combined mux clause must precede the standalone IMSIC and APLIC
     // dispatch clauses so that, when both controllers are enabled, its
     // more-specific guard wins.
@@ -446,7 +452,6 @@ extensions {
     requires core, sys, exceptions, aclic_regs, I
     files extensions/aclic/smnip.sail
   }
-
 
   Zawrs {
     requires core

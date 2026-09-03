@@ -141,6 +141,18 @@ let plat_aplic_base : physaddrbits = to_bits_checked(config platform.aplic.base 
 // (a machine-level root and a supervisor-level child at the same hart).
 let plat_aplic_num_domains : range(1, 2) = config platform.aplic.num_domains
 
+// ACLIC (Advanced Core-Local Interrupt Controller) hart-local interrupt
+// domain control (Smidctrl/Ssidctrl). The ACLIC reuses the per-domain APLIC
+// source state (pending/enable/target/sourcecfg) but operates it entirely
+// through hart-local indirect CSRs rather than the memory-mapped APLIC. It is
+// mutually exclusive with the IMSIC (both drive xEIP). The per-domain APLIC
+// state files are always compiled in, so enabling the ACLIC does not require
+// plat_aplic_enabled (the memory-mapped APLIC window). Domain 0 is the
+// machine-level domain and domain 1 the supervisor-level domain, mirroring
+// aplic_domain_privilege.
+let plat_have_aclic : bool = config platform.aclic.supported
+
+
 let plat_insns_per_tick : nat1 = config platform.instructions_per_tick
 
 

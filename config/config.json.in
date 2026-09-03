@@ -479,7 +479,18 @@
       // Number of active interrupt domains (1 or 2).
       "num_domains": 2
     },
+    // ACLIC (Advanced Core-Local Interrupt Controller) hart-local interrupt
+    // domain control (Smidctrl/Ssidctrl). The ACLIC reuses the per-domain
+    // APLIC source state but operates it entirely through hart-local indirect
+    // CSRs, with no memory-mapped window. It is mutually exclusive with the
+    // IMSIC (both drive the external interrupt signal).
+    "aclic": {
+      // Whether the platform contains an ACLIC.
+      "supported": false
+    },
+
     "clock_frequency": 1000000000,
+
 
     "instructions_per_tick": 2,
     "wfi_is_nop": false,
@@ -966,6 +977,19 @@
     // Advanced Interrupt Architecture, supervisor level. Requires Smaia and Sscsrind.
     "Ssaia": {
       "supported": true
+    },
+    // ACLIC hart-local interrupt domain control, machine level. Requires
+    // Smaia (hence Smcsrind). Operates the per-domain APLIC source state
+    // through the mireg/mireg2/mireg3 indirect CSRs and mtopei. Requires
+    // platform.aclic.supported.
+    "Smidctrl": {
+      "supported": false
+    },
+    // ACLIC hart-local interrupt domain control, supervisor level. Requires
+    // Smidctrl, Ssaia (hence Sscsrind), and S.
+    "Ssidctrl": {
+      "supported": false
     }
   }
 }
+
