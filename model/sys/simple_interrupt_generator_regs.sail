@@ -56,45 +56,57 @@ function sig_legalize_topei_cfg(data : bits(32)) -> bits(32) = {
 }
 
 
-// The Simple Interrupt Generator is the default external interrupt
-// controller: it provides the shared ext_intctl_topei interface (declared
-// in core/external_interrupt_ctl.sail) that mtopi/stopi (and, later, an
+// The Simple Interrupt Generator is an external interrupt controller: it
+// backs the shared ext_intctl_topei interface (declared in
+// core/external_interrupt_ctl.sail) that mtopi/stopi (and, later, an
 // APLIC/IMSIC) consume. The reported (identity, priority) comes from the
 // mtopei_cfg / stopei_cfg configuration registers, gated by the raw
 // sig_meip / sig_seip pending inputs: when the pending input is low the
 // controller reports minor identity 0 (no interrupt), which the shared
 // ext_intctl_pending derives as "not pending".
 // Machine is MEI; any other privilege is treated as the supervisor
-// external interrupt (SEI). These functions are only ever queried for
-// Machine and Supervisor.
-function clause ext_intctl_topei(Machine) =
-  if sig_meip == 0b1
-  then (sig_topei_cfg_identity(sig_mtopei_cfg), sig_topei_cfg_priority(sig_mtopei_cfg))
-  else (zeros(), zeros())
-function clause ext_intctl_topei(_) =
-  if currentlyEnabled(Ext_S) & sig_seip == 0b1
-  then (sig_topei_cfg_identity(sig_stopei_cfg), sig_topei_cfg_priority(sig_stopei_cfg))
-  else (zeros(), zeros())
+// external interrupt (SEI). This is only ever queried for Machine and
+// Supervisor.
+//
+// This is a plain helper rather than an ext_intctl_topei clause: the single
+// ext_intctl_topei clause set lives in a separate dispatch file
+// (sys/ext_intctl_default.sail by default, replaced by the IMSIC/APLIC
+// controller module when one is configured), so that only one clause set
+// ever exists for the interface. The dispatcher calls this helper when the
+// Simple Interrupt Generator is the active controller.
+function sig_ext_intctl_topei(priv : Privilege) -> (bits(11), bits(8)) =
+  match priv {
+    Machine =>
+      if sig_meip == 0b1
+      then (sig_topei_cfg_identity(sig_mtopei_cfg), sig_topei_cfg_priority(sig_mtopei_cfg))
+      else (zeros(), zeros()),
+    _ =>
+      if currentlyEnabled(Ext_S) & sig_seip == 0b1
+      then (sig_topei_cfg_identity(sig_stopei_cfg), sig_topei_cfg_priority(sig_stopei_cfg))
+      else (zeros(), zeros()),
+  }
 
-// The Simple Interrupt Generator's contribution to the shared claim
-// interface (ext_intctl_claim, declared in core/external_interrupt_ctl.sail).
-// The SIG has no per-source claim state, so a claim reports the current top
-// interrupt (identical to ext_intctl_topei) and, as its only side effect,
-// deasserts the wired pending input (sig_meip / sig_seip) for the claimed
-// privilege when an interrupt was actually pending. A claim with nothing
-// pending reports minor identity 0 and leaves the pending input untouched.
-function clause ext_intctl_claim(Machine) =
-  if sig_meip == 0b1 then {
-    let claimed = (sig_topei_cfg_identity(sig_mtopei_cfg), sig_topei_cfg_priority(sig_mtopei_cfg));
-    sig_meip = 0b0;
-    claimed
-  } else (zeros(), zeros())
-function clause ext_intctl_claim(_) =
-  if currentlyEnabled(Ext_S) & sig_seip == 0b1 then {
-    let claimed = (sig_topei_cfg_identity(sig_stopei_cfg), sig_topei_cfg_priority(sig_stopei_cfg));
-    sig_seip = 0b0;
-    claimed
-  } else (zeros(), zeros())
+// Claim (read-and-clear) the top external interrupt for the Simple
+// Interrupt Generator. It reports the current top (identity, priority) via
+// sig_ext_intctl_topei and, when an interrupt is present, deasserts the
+// corresponding wired external-interrupt pending latch (sig_meip for
+// Machine, sig_seip for Supervisor) so the interrupt is acknowledged. The
+// sig_meip / sig_seip latches are private to this file, so the clearing
+// claim helper must live here. Returns the reported (identity, priority);
+// an identity of zero means there was nothing to claim and no latch is
+// cleared.
+function sig_ext_intctl_claim(priv : Privilege) -> (bits(11), bits(8)) = {
+  let reported = sig_ext_intctl_topei(priv);
+  let (identity, _) = reported;
+  if identity != zeros() then {
+    match priv {
+      Machine => sig_meip = 0b0,
+      _       => if currentlyEnabled(Ext_S) then sig_seip = 0b0,
+    }
+  };
+  reported
+}
+
 
 
 // The external interrupt pending set (xEIP) is derived from the controller

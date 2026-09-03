@@ -109,7 +109,27 @@ let plat_have_sig : bool = config platform.simple_interrupt_generator.supported
 let plat_sig_base : physaddrbits = to_bits_checked(config platform.simple_interrupt_generator.base : int)
 let plat_sig_size : physaddrbits = zero_extend(0x20)
 
+// IMSIC (Incoming MSI Controller). This first draft models the M-mode and
+// S-mode interrupt files only. Each interrupt file occupies one 4KiB page;
+// the M-mode file is at plat_imsic_base and the S-mode file (when S is
+// supported) is at plat_imsic_base + 0x1000. The number of interrupt
+// identities per file is configurable (default 255) and must be in the
+// range 1 .. 2047.
+let plat_have_imsic : bool = config platform.imsic.supported
+let plat_imsic_base : physaddrbits = to_bits_checked(config platform.imsic.base : int)
+// Size of the whole IMSIC MMIO window (M file + S file), each 4KiB.
+let plat_imsic_size : physaddrbits = zero_extend(0x2000)
+// Number of implemented interrupt identities per interrupt file. Identity 0
+// is reserved (never pending). Identities above this value are read-only zero.
+let plat_imsic_num_ids : int = config platform.imsic.num_interrupt_identities
+
+// APLIC (Advanced Platform-Level Interrupt Controller) enable flag. Referenced
+// by the IMSIC eidelivery deliverer-select logic; the memory-mapped APLIC
+// device itself is introduced in a later commit.
+let plat_aplic_enabled : bool = config platform.aplic.supported
+
 let plat_insns_per_tick : nat1 = config platform.instructions_per_tick
+
 
 // Whether WFI is available to User mode.
 let plat_wfi_available_to_usermode : bool = config platform.wfi_available_to_user_mode

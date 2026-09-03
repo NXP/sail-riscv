@@ -431,7 +431,33 @@
       // as 0.
       "base": 201326592
     },
+    // IMSIC (Incoming MSI Controller). This first draft models the M-mode
+    // and S-mode interrupt files only. The IMSIC and the simple interrupt
+    // generator are mutually exclusive external interrupt controllers: at
+    // most one of them may be `supported`.
+    "imsic": {
+      // Whether the platform contains an IMSIC.
+      "supported": false,
+      // If supported, this must be in a suitable IO memory region (see
+      // `memory.regions`) and page (4KiB) aligned. The IMSIC occupies two
+      // 4KiB pages: the M-mode interrupt file at `base` and (when S mode is
+      // supported) the S-mode interrupt file at `base + 0x1000`. If not
+      // supported, this can be left as 0.
+      "base": 0,
+      // The number of interrupt identities implemented per interrupt file.
+      // Identity 0 is reserved. Must be in the range 1 .. 2047. The default
+      // is 255.
+      "num_interrupt_identities": 255
+    },
+    // APLIC (Advanced Platform-Level Interrupt Controller). The IMSIC's
+    // eidelivery deliverer-select logic references this enable flag; the
+    // memory-mapped APLIC device itself is introduced in a later commit.
+    "aplic": {
+      // Whether the platform contains an APLIC.
+      "supported": false
+    },
     "clock_frequency": 1000000000,
+
     "instructions_per_tick": 2,
     "wfi_is_nop": false,
     // WFI is optionally available to User mode.  Note that even if
