@@ -502,14 +502,17 @@ function legalize_tvec(
   direct_supported : bool,
   direct_alignment_exp : tvec_alignment,
   vectored_supported : bool,
-  vectored_alignment_exp : tvec_alignment
+  vectored_alignment_exp : tvec_alignment,
+  jumptable_supported : bool
 ) -> Mtvec = {
   let v = Mk_Mtvec(v);
   // Legalize mode.
   let v : Mtvec = match trapVectorMode(v[Mode]) {
-    TV_Direct => if direct_supported then v else [v with Mode = o[Mode]],
-    TV_Vector => if vectored_supported then v else [v with Mode = o[Mode]],
-    _         => match xtvec_mode_reserved_behavior {
+    TV_Direct    => if direct_supported then v else [v with Mode = o[Mode]],
+    TV_Vector    => if vectored_supported then v else [v with Mode = o[Mode]],
+    // Jump-table mode (Smijt/Ssijt) reuses the reserved encoding 0b11.
+    TV_JumpTable => if jumptable_supported then v else [v with Mode = o[Mode]],
+    TV_Reserved  => match xtvec_mode_reserved_behavior {
       Xtvec_Fatal => reserved_behavior("Tried to write a reserved value (" ^ dec_str(unsigned(v[Mode])) ^ ") to the MODE field of xtvec."),
       Xtvec_Ignore => [v with Mode = o[Mode]],
     },
@@ -518,9 +521,14 @@ function legalize_tvec(
   let base_alignment : tvec_alignment = match trapVectorMode(v[Mode]) {
     TV_Direct   => direct_alignment_exp,
     TV_Vector   => vectored_alignment_exp,
+    // In jump-table mode xtvec[Base] still holds the direct fallback base
+    // (used when a table entry has its vectoring-enable bit clear), so it
+    // uses the direct-mode alignment.
+    TV_JumpTable => direct_alignment_exp,
     TV_Reserved => // This should never happen due to the check above.
                    internal_error(__FILE__, __LINE__, "Reserved mode in xtvec."),
   };
+
   // v[Base] doesn't contain the lowest 2 bits, and hence is at least 4-byte aligned.
   if base_alignment > 2
   then [v with Base = [v[Base] with (base_alignment - 3) .. 0 = zeros()]]
@@ -545,9 +553,16 @@ function tvec_addr(m : Mtvec, c : Mcause) -> option(xlenbits) = {
     TV_Vector => if   c[IsInterrupt] == 0b1
                  then Some(base + (zero_extend(c[Cause]) << 2))
                  else Some(base),
+    // Jump-table mode (Smijt/Ssijt): the actual handler address comes from a
+    // memory read performed by the fault-capable vectoring hook, which cannot
+    // be done here. This returns the direct fallback base (xtvec[Base] << 2),
+    // which is also the address used when a table entry's vectoring-enable
+    // (VEN) bit is clear.
+    TV_JumpTable => Some(base),
     TV_Reserved => None()
   }
 }
+
 
 function clause currentlyEnabled(Ext_Sstvecd) = hartSupports(Ext_Sstvecd) & currentlyEnabled(Ext_S)
 

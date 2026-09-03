@@ -21,6 +21,14 @@ let plat_mtvec_direct_base_alignment_exp   : tvec_alignment = config base.mtvec.
 let plat_mtvec_vectored_base_alignment_exp : tvec_alignment = config base.mtvec.vectored.base_alignment
 let plat_stvec_vectored_base_alignment_exp : tvec_alignment = config base.stvec.vectored.base_alignment
 
+// Interrupt jump-table base alignment (Smijt/Ssijt). The ACLIC layout
+// fixes mijt/sijt.BASE at bits [XLEN-1:6], so the minimum alignment is
+// 2^6 (64 bytes); the exact alignment above that is implementation-defined.
+type ijt_alignment = range(6, 24)
+let plat_mijt_base_alignment_exp : ijt_alignment = config base.mijt.base_alignment
+let plat_sijt_base_alignment_exp : ijt_alignment = config base.sijt.base_alignment
+
+
 // Delegatable bits of `medeleg` and `mideleg`.
 let plat_medeleg_delegatable_bits : bits(64) = config base.medeleg.delegatable_bits
 let plat_mideleg_delegatable_bits : xlenbits = config base.mideleg.delegatable_bits

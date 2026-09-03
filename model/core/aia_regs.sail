@@ -168,6 +168,79 @@ function clause write_CSR(0xFB0, _) = Ok(read_mtopi())
 function clause write_CSR(0xDB0, _) = Ok(read_stopi())
 
 // -------------------------------------------------------------------------
+// Smnip/Ssnip: mtopsi/stopsi arbitration (shared core helper)
+// -------------------------------------------------------------------------
+//
+// mtopsi/stopsi report the top pending-and-enabled interrupt using the same
+// AIA arbitration as mtopi/stopi (topi_iid/topi_iprio), but with a different
+// wire layout:
+//   SIID  [XLEN-1:16]  signed interrupt identity
+//   IPRIO [8:0]        reported interrupt priority (IPRIOLEN+1 bits)
+//
+// SIID encoding (ACLIC spec):
+//   - External interrupt (MEI for M, SEI for S): SIID = the external
+//     controller's minor identity (positive, from ext_intctl_topei).
+//   - Any other (major) interrupt: SIID = the two's-complement negation of
+//     the major identity, i.e. a negative number whose magnitude is the
+//     major interrupt number.
+//   - No interrupt pending-and-enabled: SIID = 0.
+//
+// IPRIO reporting:
+//   - When an interrupt exists, IPRIO is topi_iprio (1..255), zero-extended
+//     into the 9-bit field.
+//   - When no interrupt exists, IPRIO reads back the supplied threshold
+//     (xithreshold.iprio), so mtopsi with no pending source reports the
+//     threshold in its IPRIO field.
+//
+// The pending/enabled sets are computed here (in core) because the
+// supervisor lowered-enable helper (lower_mie) is private to
+// core/interrupt_regs.sail. `threshold` is xithreshold.iprio, passed in by
+// the Smnip CSR clause in extensions/aclic/aclic_regs.sail.
+function read_xtopsi(priv : Privilege, threshold : bits(9)) -> xlenbits = {
+  // The external interrupt (MEI for M, SEI for S) is arbitrated and delivered
+  // by the ACLIC domain (its per-source EIE), independently of the hart-level
+  // xie.xEIE bit. mtopsi/stopsi report the ACLIC's own top interrupt view, so
+  // the external interrupt is treated as enabled here whenever the controller
+  // asserts it (read_mip sets the xEIP bit via external_interrupts_pending);
+  // xie.xEIE only affects hart trap delivery, not the mtopsi report. Other
+  // (major) interrupts still honour the real xie enables.
+  let external_iid : range(0, 63) = match priv { Machine => 11, _ => 9 };
+  let (pending, enabled) : (Minterrupts, Minterrupts) = match priv {
+    Machine => (read_mip(IncludePlatformInterrupts), [mie with MEI = 0b1]),
+    _       => (Mk_Minterrupts(read_sip(IncludePlatformInterrupts).bits),
+                [Mk_Minterrupts(lower_mie(mie, mideleg).bits) with SEI = 0b1]),
+  };
+  match topi_iid(pending, enabled) {
+    None()  => {
+      // No pending-and-enabled interrupt: SIID = 0, IPRIO = threshold.
+      zero_extend(threshold)
+    },
+    Some(i) => {
+      let iprio = topi_iprio(priv, i);
+      // eithreshold-style gating: a threshold of zero disables masking; a
+      // nonzero threshold masks any interrupt whose priority number is
+      // numerically greater than or equal to the threshold. A masked top
+      // interrupt reports as "no interrupt": SIID = 0, IPRIO = threshold.
+      if unsigned(threshold) != 0 & unsigned(iprio) >= unsigned(threshold) then {
+        zero_extend(threshold)
+      } else {
+        let siid : xlenbits =
+          if i == external_iid then {
+            // External interrupt: positive minor identity from the controller.
+            let (minor, _) = ext_intctl_topei(priv);
+            zero_extend(minor)
+          } else {
+            // Major interrupt: two's-complement negation of the identity.
+            (zeros() : xlenbits) - to_bits(xlen, i)
+          };
+        (siid << 16) | zero_extend(iprio)
+      }
+    },
+  }
+}
+
+
+// -------------------------------------------------------------------------
 // mvien / mvip (minimal) and their RV32 high halves
 // -------------------------------------------------------------------------
 
